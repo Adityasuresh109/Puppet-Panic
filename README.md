@@ -1,60 +1,69 @@
-# PUPPET PANIC! 🎭💥
+# PUPPET PANIC! — Puppet Lab 🦵💥
 
 **Five puppets. Twenty-three controllers. Zero coordination.**
 
-Puppet Panic! is an original, browser-based cooperative-chaos party game. Up to 23 friends control five floppy characters on one shared TV, using their own phones as body-part controllers. The fun comes from **learnable teamwork**, spectacular recoverable mistakes, expressive characters, and memorable replays.
+Puppet Panic! is an original TV + phones cooperative-physics party game in development. Our first **playable browser prototype** is **Walk, You Idiots!**: control Bongo's limbs separately, stumble your way through hazards, and reach the finish.
 
-## Project status
+![Browser game screenshot](docs/lab-screenshot.jpg)
 
-**Phase 0: Development foundation.** The repository is initialized; the game itself is not yet playable. Implementation starts with the *Puppet Lab* vertical slice.
+## Try the current prototype
 
-## Gameplay contract
+- Open **index.html** on a web server, or use the project URL after Pages deployment is configured.
+- Click **LET'S MAKE A DISASTER**.
+- Alternate holding/releasing **A** (left leg) and **D** (right leg). Planting each foot propels Bongo forward.
+- Press **J** and **K** to swing individual arms for a little extra momentum and stability.
+- Hold **Left / Right arrows** to lean the torso; tap **Space** to brace (cooldown).
+- Press **R** to restart and **H** for instructions, or use the on-screen touch controls.
+- **WATCH AI DEMO** enables a scripted automated control pattern for demonstrating the physics; it is not a paid AI API.
 
-- Five simultaneous teams: 5 / 5 / 5 / 4 / 4 players at the target party size.
-- Each puppet has five control channels: left leg, right leg, left arm, right arm, and torso/balance.
-- Four-player teams use a dual-leg controller; physical ability limits remain identical across teams.
-- Phones are controllers, **not** independent game simulations. The host/TV runs the authoritative physics.
-- No permanent player elimination, no mandatory game downloads, no paid assets or runtime AI APIs.
-- Mistakes should be funny, but teammates must be able to learn and improve.
+At the moment, the five control channels are all available from one browser. **There is no multiplayer room or phone-to-TV synchronization yet.**
 
-## Intended stack
+## Run it locally
 
-- **Frontend/TV**: Phaser + TypeScript + Vite
-- **Physics prototype**: Phaser Matter.js; evaluate Rapier 2D if joint motors are needed
-- **Phones**: responsive touch-only web UI with large controls
-- **Realtime**: WebSocket relay (Cloudflare Durable Objects is the preferred free-tier candidate)
-- **Visuals**: original illustrated puppets; Blender, Inkscape and CC0 assets as appropriate
-- **Audio**: original and properly licensed sound effects, Howler.js and ZzFX
-- **Tests**: Vitest and Playwright
+Requires Node.js 20+; there are **zero npm dependencies** in this experimental prototype.
 
-All licenses and third-party assets must be tracked before shipping.
+```bash
+npm run dev
+# open http://localhost:4173
+```
 
-## Development milestones
+Run tests and produce static output:
 
-1. **Puppet Lab (first playable slice):** one puppet, a short flat track, five distinct body channels, hold/release input, recoverable stumbling, checkpoint, and a finish line. Test control intuitiveness before multiplayer.
-2. **Comedy pass:** expressions, squash-and-stretch, different collision reactions, comedic sound and replays.
-3. **23-controller multiplayer:** five puppets, rooms, join codes, host screen, phone roles, reconnect, and server relay.
-4. **Puppet Olympics:** walking, cake carrying, climbing, swinging, and finale events with balanced scoring.
-5. **Polish & distribution:** tutorial, reliability and load testing, audio balancing, mobile accessibility, deployment.
+```bash
+npm test
+npm run build
+# deploy dist/ as static site
+```
 
-## Engineering guardrails
+The game is also suitable for simple static hosting (for example GitHub Pages) because it uses native browser APIs and ES modules. For best results, use a modern Chromium, Safari, or Firefox browser.
 
-- Prioritize fun and control responsiveness over physical realism.
-- Use a fixed-time-step host simulation and send only compact input changes from phones.
-- Treat the host as authoritative: clients cannot submit scores or physics state.
-- Avoid relying on perfect low-latency Internet connections; tolerate jitter and reconnects.
-- Never introduce mechanics that leave arm or balance controllers idle for long periods.
-- Do not publish a "23-player ready" claim until a 23-device playtest succeeds.
-- Keep experimental changes in branches/PRs as the codebase grows.
+## What is already implemented
 
-## First acceptance criteria
+- [x] One animated, articulated assisted-puppet with simulated momentum and balance
+- [x] Independent left/right leg stepping, left/right arm swinging, torso lean and brace
+- [x] Recoverable falls, timed automatic get-up, fall counter and wobbly state
+- [x] Camera-following cartoon running course, three checkpoints, three cones and finish
+- [x] Comic facial expressions, sound synthesis, toast reactions and confetti
+- [x] Working keyboard and on-screen pointer/touch controls
+- [x] Auto-demo mode, restart, instructions and sound toggle
+- [x] Deterministic simulation tests plus manually checked browser interactions
 
-An inexperienced five-person group should be able to make the puppet move, stumble, recover, and cross a short track, with each control demonstrably affecting the outcome. Testers should noticeably improve after two or three attempts, and falls should be amusing rather than immobilizing.
+## Next development gates
 
-## Project docs
+1. **Human playtest** (Issue #1 still open): confirm the body-part controls are genuinely fun with real players. Tune cadence, penalties and fall recovery.
+2. **Advanced joints / visual polish**: currently the puppet uses custom assisted torso physics and spring-damped limb particles. Evaluate replacing this with motorized Rapier 2D joints or Phaser/Matter.js integration when installation is available. Do not confuse this physics lab with a full physically constrained ragdoll.
+3. **True multiplayer**: room code, authoritative TV/host simulation, WebSocket relay, phone-specific roles, reconnect, four-player team controls, five puppets, load testing with 23 devices.
+4. **Events**: Don't Drop the Cake, The Impossible Climb, Swing for Your Life, and the Puppet Olympics finale.
+5. **Presentation**: audio polish, animation and high-quality replay export, deployment and social sharing.
 
-See [the technical game specification](docs/technical-game-spec.md) for the MVP movement model, controls, multiplayer approach and test targets.
+See [the full technical spec](docs/technical-game-spec.md) and [build progress](docs/progress.md).
 
----
+## License and assets
 
-Original game design. External third-party components retain their own licenses.
+Original game artwork, rendering code and synthesized sound have no third-party media dependencies in this slice. The original game code has **not** been explicitly open-source licensed by the project owner; `package.json` uses `UNLICENSED` pending that decision. Future dependencies and asset packs will be inventoried in this section and tracked by license before shipping.
+
+### Status / limitations
+
+- Local scripted browser interaction has been validated; a real multi-person playtest and cross-device mobile QA are pending.
+- No live multi-device service or final production URL has been deployed by this commit.
+- This browser-only physics proof-of-concept is a deliberate zero-dependency stepping stone toward the planned Phaser/modern physics engine.
