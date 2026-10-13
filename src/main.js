@@ -6,7 +6,8 @@ const canvas = $('game'); const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const puppet = new Puppet({ color:'#ffc24c',name:'BONGO' });
 const sound = new Sound();
-let started=false, demo=false, clock=0, lastFrame=0, acc=0, lastEvent=-1;
+let started=false, demo=false, clock=0, lastFrame=0, acc=0, lastEventId=0;
+let demoCycle=-1, demoSide='left';
 let lastToastAt=-10, toastUntil=0, scoreShown=false;
 const held = {leftLeg:false,rightLeg:false,leftArm:false,rightArm:false,brace:false,leanLeft:false,leanRight:false};
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -17,13 +18,18 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function confetti(x,y,count=16){if(reducedMotion)return;for(let i=0;i<count;i++)bits.push({x,y,vx:rnd(-170,170),vy:rnd(-340,-100),life:rnd(.5,1.5),t:0,c:['#ffcc43','#fb7a94','#70e4db','#9ca7ff','#fff'][i%5],r:rnd(3,7)});}
 function toast(str,sec=1.5){$('toast').textContent=str;$('toast').classList.add('show');toastUntil=clock+sec;}
 function handleEvents(){
- for(const ev of puppet.events){if(ev.time<=lastEvent)continue;lastEvent=ev.time;
-   if(!['step','swing'].includes(ev.type)) sound.play(ev.type);
-   else if(ev.type==='step'&&Math.random()<.24)sound.play('step');
-   if(ev.type==='fall') {confetti(590,410,10);toast(quotes.fall[Math.floor(Math.random()*quotes.fall.length)]);}
-   if(ev.type==='checkpoint') {confetti(620,190,32);toast(quotes.checkpoint[Math.floor(Math.random()*quotes.checkpoint.length)]);}
-   if(ev.type==='bonk') {toast('BONK! WATCH THOSE CONES!',.8);}
-   if(ev.type==='finish') {confetti(720,200,100);toast('BONGO DID IT!',3);}
+ for(const ev of puppet.events){if(ev.id<=lastEventId)continue;lastEventId=ev.id;
+   if(['fall','checkpoint','bonk','finish','recover','cakeDrop','slip'].includes(ev.type)) sound.play(ev.type);
+   else if(ev.type==='step'&&Math.random()<.3)sound.play('step');
+   if(ev.type==='fall') {confetti(590,410,12);toast(quotes.fall[Math.floor(Math.random()*quotes.fall.length)]);}
+   if(ev.type==='slip') {
+     const reasons={'wrong-foot':'WRONG FOOT! SWITCH LEGS!','bad-timing':'BAD TIMING! HOLD FOR A BEAT!','no-support':'BOTH FEET UP?!','weight-transfer':'BODY DID NOT SHIFT WEIGHT!','arm-sync':'ARM TEAM OUT OF SYNC!','cake-grip':'HOLD THE CAKE WITH BOTH ARMS!'};
+     toast(reasons[ev.reason]||'WRONG MOVE! TRY TO COORDINATE!',1.1);
+   }
+   if(ev.type==='cakeDrop'){confetti(620,320,16);toast(ev.layers?`CAKE LOST A LAYER! ${ev.layers} LEFT!`:'THE CAKE IS DESTROYED!',2);}
+   if(ev.type==='checkpoint') {confetti(620,190,32);toast('CHECKPOINT SAVED!');}
+   if(ev.type==='bonk') toast('BONK! YOU HIT THE OBSTACLE!',.8);
+   if(ev.type==='finish') {confetti(720,200,100);toast('THE TEAM DID IT!',3);}
  }
 }
 function updateControls(){
@@ -31,7 +37,7 @@ function updateControls(){
 }
 function setHeld(action,down){
  if(!(action in held))return;
- if(demo){demo=false;$('demo').classList.remove('active');$('demo').textContent='▶ WATCH AI DEMO';}
+ if(demo){demo=false;$('demo').classList.remove('active');$('demo').textContent='▶ WATCH TEAMWORK DEMO';}
  held[action]=down;
  document.querySelectorAll(`[data-action="${action}"]`).forEach(el=>el.classList.toggle('pressed',down));
  updateControls();
@@ -53,6 +59,19 @@ for(const button of document.querySelectorAll('[data-action]')){
 }
 $('start').addEventListener('click',start);
 $('reset').addEventListener('click',reset);
+for(const button of document.querySelectorAll('[data-mode]')) {
+  button.addEventListener('click',()=>{
+    puppet.setMode(button.dataset.mode);
+    reset(false);
+    document.querySelectorAll('[data-mode]').forEach(el=>el.classList.toggle('active',el.dataset.mode===puppet.mode));
+    $('mode-description').textContent=puppet.mode==='cake'
+      ? 'CAKE RUN · Both arm players must GRIP. Alternate legs with correct weight shifts. Drop your hands or tip the tray and lose layers.'
+      : 'WALK · LEFT foot needs RIGHT arm + RIGHT lean; RIGHT foot needs LEFT arm + LEFT lean. Bad timing causes slips and faceplants.';
+    $('intro-challenge').textContent=puppet.mode==='cake'?'DON\'T DROP THE CAKE!':'WALK, YOU IDIOTS!';
+    document.querySelector('.left-arm p').textContent=puppet.mode==='cake'?'Hold to support the left side of the cake':'Counter-swing during the right-foot step';
+    document.querySelector('.right-arm p').textContent=puppet.mode==='cake'?'Hold to support the right side of the cake':'Counter-swing during the left-foot step';
+  });
+}
 $('help').addEventListener('click',()=>$('instructions').showModal());
 $('close-help').addEventListener('click',()=>$('instructions').close());
 $('instructions').addEventListener('click',e=>{if(e.target===$('instructions'))$('instructions').close();});
@@ -60,15 +79,24 @@ $('sound').addEventListener('click',()=>{sound.enabled=!sound.enabled;$('sound')
 $('demo').addEventListener('click',()=>{
  if(!started)start();
  if(puppet.phase==='finished')reset();
- demo=!demo; $('demo').classList.toggle('active',demo);$('demo').textContent=demo?'◼ STOP AI DEMO':'▶ WATCH AI DEMO';
- if(!demo){Object.keys(held).forEach(key=>held[key]=false);updateControls();}
+ demo=!demo; $('demo').classList.toggle('active',demo);$('demo').textContent=demo?'◼ STOP AI DEMO':'▶ WATCH TEAMWORK DEMO';
+ if(!demo){Object.keys(held).forEach(key=>held[key]=false);updateControls();document.querySelectorAll('.pad-btn').forEach(el=>el.classList.remove('pressed'));}
 });
 function start(){started=true;scoreShown=false;$('overlay').hidden=true;}
-function reset(){puppet.reset();Object.keys(held).forEach(k=>held[k]=false);updateControls();started=true;scoreShown=false;demo=false;clock=0;lastEvent=-1;bits=[];$('overlay').hidden=true;$('demo').textContent='▶ WATCH AI DEMO';$('demo').classList.remove('active');}
+function reset(wipePhysics=true){if(wipePhysics)puppet.reset();Object.keys(held).forEach(k=>held[k]=false);updateControls();started=true;scoreShown=false;demo=false;clock=0;lastEventId=0;demoCycle=-1;bits=[];$('overlay').hidden=true;$('demo').textContent='▶ WATCH TEAMWORK DEMO';$('demo').classList.remove('active');}
 function demoInput(){
- const t=puppet.time;
- const phase=t%0.64;
- puppet.setInput({leftLeg:phase<.30,rightLeg:phase>=.33,leftArm:t%.96<.25,rightArm:(t+.48)%.96<.25,lean:Math.sin(t*1.45)*.38,brace:Math.abs(puppet.tilt)>.4&&puppet.cooldown<=0});
+ const cycle=Math.floor(puppet.time/.57);
+ if(cycle!==demoCycle){demoCycle=cycle;demoSide=puppet.expectedSide;}
+ const within=puppet.time% .57;
+ const isLeft=demoSide==='left';
+ // Demonstrate a real coordinated team: support leg remains down, arm counter-swings,
+ // torso shifts toward supporting foot, and moving foot plants after 0.35 seconds.
+ puppet.setInput({
+   leftLeg:isLeft&&within<.35,rightLeg:!isLeft&&within<.35,
+   leftArm:puppet.mode==='cake'||!isLeft,rightArm:puppet.mode==='cake'||isLeft,
+   lean:isLeft?1:-1,
+   brace:false
+ });
 }
 function drawBackground(cam){
  const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#6eabeb');sky.addColorStop(.7,'#b5e6fa');sky.addColorStop(1,'#e2f6ed');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
@@ -156,6 +184,17 @@ function drawPuppet(p,cam){
  ctx.strokeStyle='#fff4cd';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-18,-11);ctx.lineTo(-10,13);ctx.moveTo(18,-11);ctx.lineTo(10,13);ctx.stroke();
  ellipse(-11,23,3,3,'#ffe49e');ellipse(11,23,3,3,'#ffe49e');
  ctx.restore();
+ if(p.mode==='cake') {
+   ctx.save();ctx.translate(0,-76);ctx.rotate(p.cakeAngle);
+   roundedRect(-57,-5,114,9,4,'#41466b');
+   roundedRect(-51,-13,102,12,4,'#fde9a2');
+   for(let tier=0;tier<p.layers;tier++){
+     const wide=45-tier*11;
+     roundedRect(-wide,-14-(tier+1)*19,wide*2,21,5,['#ffc7d0','#ffefb6','#b8f0e2'][tier]);
+     roundedRect(-wide,-14-(tier+1)*19,wide*2,5,3,'#fff6d8');
+   }
+   ctx.restore();
+ }
  // Huge expressive bobble-head.
  ellipse(head.x,head.y+1,37,38,dark);ellipse(head.x,head.y-3,34,36,'#ffdfa2');
  ellipse(head.x-13,head.y-10,10,13,'#fff');ellipse(head.x+13,head.y-10,10,13,'#fff');
@@ -176,7 +215,7 @@ function drawScene(){
  ctx.clearRect(0,0,W,H);
  drawBackground(camera);drawTrack(camera);drawPuppet(puppet,camera);
  ctx.save();ctx.font='900 14px system-ui';ctx.textAlign='center';
- roundedRect(puppet.x-camera-72,201,146,35,14,'#273855');ctx.fillStyle='#fff';ctx.fillText('BONGO ✳',puppet.x-camera,224);
+ roundedRect(puppet.x-camera-72,201,146,35,14,'#273855');ctx.fillStyle='#fff';ctx.fillText(puppet.mode==='cake'?'BONGO + CAKE 🎂':'BONGO ✳',puppet.x-camera,224);
  ctx.restore();
  for(const p of bits){ctx.globalAlpha=clamp(1-p.t/p.life,0,1);ctx.fillStyle=p.c;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.t*6);ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*.6);ctx.restore();}
  ctx.globalAlpha=1;
@@ -190,16 +229,27 @@ function updateDom(){
  $('progress').style.width=`${(puppet.progress*100).toFixed(1)}%`;
  $('distance').textContent=`${Math.round(puppet.progress*100)}%`;
  $('cooldown').textContent=puppet.cooldown>0?`${Math.ceil(puppet.cooldown)}s`:'';
+ $('next-foot').textContent=`${puppet.expectedSide.toUpperCase()} FOOT NEXT`;
+ $('balance-value').textContent=`${Math.round(puppet.unsteady*100)}% DANGER`;
+ $('balance-fill').style.width=`${Math.min(100,Math.round(puppet.unsteady*100))}%`;
+ $('combo').textContent=String(puppet.combo);
+ $('cakes').textContent=puppet.mode==='cake'?`🎂 ${puppet.layers} LAYERS`:'5 ROLES REQUIRED';
+
 }
 function finishCard(){
- if(scoreShown)return;scoreShown=true;demo=false;$('demo').textContent='▶ WATCH AI DEMO';$('demo').classList.remove('active');
- const best=Math.round(puppet.finishedAt);const conf=puppet.falls===0?'LEGENDARY LEGWORK':'A BEAUTIFUL DISASTER';
- $('overlay').innerHTML=`<div class="overlay-card"><span class="overlay-eyebrow">🏆 PUPPET LAB COMPLETE!</span><div class="puppet-preview">🏆</div><h2>${conf}</h2><p>Bongo somehow crossed the finish line in <b>${best} seconds</b> with <b>${puppet.falls} faceplants</b>. That counts as a victory.</p><div class="overlay-guide"><span>🏁 100% COMPLETE</span><span>💥 ${puppet.falls} FALLS</span></div><button id="play-again" class="big-button">DO IT AGAIN <span>↻</span></button><small>The full 23-player Olympics is in development.</small></div>`;
+ if(scoreShown)return;scoreShown=true;demo=false;$('demo').textContent='▶ WATCH TEAMWORK DEMO';$('demo').classList.remove('active');
+ const best=Math.round(puppet.finishedAt);const conf=puppet.falls===0?'LEGENDARY TEAMWORK':'A BEAUTIFUL DISASTER';
+ $('overlay').innerHTML=`<div class="overlay-card"><span class="overlay-eyebrow">🏆 PUPPET LAB COMPLETE!</span><div class="puppet-preview">🏆</div><h2>${conf}</h2><p>Bongo somehow crossed the finish line in <b>${best} seconds</b> with <b>${puppet.falls} faceplants</b> and <b>${puppet.steps} coordinated steps</b>. That is teamwork!</p><div class="overlay-guide"><span>🏁 100% COMPLETE</span><span>💥 ${puppet.falls} FALLS</span></div><button id="play-again" class="big-button">DO IT AGAIN <span>↻</span></button><small>The full 23-player Olympics is in development.</small></div>`;
  $('overlay').hidden=false;$('play-again').addEventListener('click',reset);
 }
 function tick(){
  if(!started)return;
- if(demo)demoInput(); else updateControls();
+ if(demo) {
+   demoInput();
+   const i=puppet.input;
+   const shown={leftLeg:i.leftLeg,rightLeg:i.rightLeg,leftArm:i.leftArm,rightArm:i.rightArm,leanLeft:i.lean<0,leanRight:i.lean>0,brace:i.brace};
+   document.querySelectorAll('[data-action]').forEach(el=>el.classList.toggle('pressed',!!shown[el.dataset.action]));
+ } else updateControls();
  puppet.update(STEP);
  handleEvents();
  if(puppet.phase==='finished')finishCard();
@@ -214,4 +264,4 @@ function loop(timestamp){
 }
 requestAnimationFrame(loop);
 // Test-only browser observable state; no externally writable score/physics authority.
-Object.defineProperty(window,'__puppetLab',{get:()=>({x:puppet.x,phase:puppet.phase,progress:puppet.progress,falls:puppet.falls,started,events:puppet.events.length})});
+Object.defineProperty(window,'__puppetLab',{get:()=>({x:puppet.x,phase:puppet.phase,progress:puppet.progress,falls:puppet.falls,steps:puppet.steps,combo:puppet.combo,mode:puppet.mode,layers:puppet.layers,started,events:puppet.events.length})});
