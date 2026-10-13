@@ -2,66 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#111b33" />
-  <meta name="description" content="Puppet Panic! Five puppets. Twenty-three controllers. Zero coordination. Try the physics lab." />
-  <title>Puppet Panic! — Puppet Lab</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta http-equiv="refresh" content="0;url=./host.html" />
+  <title>PUPPET PANIC! — Multiplayer Party</title>
+  <link rel="canonical" href="./host.html" />
+  <script>location.replace(new URL('./host.html',location.href));</script>
 </head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <a class="brand" href="./" aria-label="Puppet Panic home"><span class="brand-icon">✳</span><span>PUPPET<span class="accent">PANIC!</span></span></a>
-      <div class="top-meta"><span class="live-dot"></span> PUPPET LAB <span class="beta">EARLY PLAYABLE BUILD</span></div>
-      <div class="top-actions"><a class="icon-button" href="./host.html?preview=23">📺 TV PREVIEW</a><a class="icon-button" href="./controller.html?preview=BALANCE">📱 PHONE PREVIEW</a><button id="sound" class="icon-button" title="Toggle sound" aria-label="Toggle sound">♪ ON</button><button id="help" class="icon-button">? HOW TO PLAY</button></div>
-    </header>
-
-    <section class="intro">
-      <div class="eyebrow"><span class="lightning">⚡</span> TEAMWORK LAB · EXPERIMENT #002</div>
-      <h1 id="intro-challenge">WALK, <em>YOU IDIOTS!</em></h1>
-      <p>One puppet. Five essential roles. <strong>No solo victories.</strong> Step, counter-swing and lean together—or faceplant!</p>
-    </section>
-
-    <section class="arena-wrap" aria-label="Puppet race arena">
-      <div class="game-hud">
-        <div class="hud-team"><span class="circle-avatar">B</span><div><b>BONGO</b><small>THE UNCOORDINATED</small></div></div>
-        <div class="hud-time"><span>TIME</span><strong id="timer">00:00</strong></div>
-        <div class="hud-stat"><span>FACEPLANTS</span><strong id="falls">0</strong></div>
-        <div class="hud-status"><span id="status" class="status-chip">READY TO BONK</span></div>
-      </div>
-      <div class="canvas-wrap">
-        <canvas id="game" width="1280" height="625" role="img" aria-label="Interactive cartoon puppet running track"></canvas>
-        <div id="overlay" class="overlay">
-          <div class="overlay-card">
-            <span class="overlay-eyebrow">✳ INTRODUCING YOUR WORST ATHLETE</span>
-            <div class="puppet-preview">🤪</div>
-            <h2>MEET BONGO!</h2>
-            <p>One limb alone cannot move him. Coordinate the foot, opposite arm and body lean in the same moment, or watch him eat dirt.</p>
-            <div class="overlay-guide"><span>① Foot lifts</span><span>② Opposite arm swings</span><span>③ Torso leans onto planted foot</span></div>
-            <button id="start" class="big-button">LET'S MAKE A DISASTER <span>→</span></button>
-            <small>Keyboard or touch controls · press H anytime for help</small>
-          </div>
-        </div>
-        <div id="toast" class="toast" aria-live="polite"></div>
-      </div>
-      <div class="coord-strip" aria-live="polite"><span class="foot-cue" id="next-foot">LEFT FOOT NEXT</span><span id="cakes">5 ROLES REQUIRED</span><span>COMBO <b id="combo">0</b></span><div class="balance-meter"><div id="balance-fill"></div></div><span id="balance-value">0% DANGER</span></div>
-      <div class="track-strip"><div class="track-label"><span>🏁 THE WORLD'S LONGEST 24 METERS</span><span id="distance">0%</span></div><div class="progress-track"><div id="progress" class="progress-fill"></div><div class="checkpoint" style="left:22%"></div><div class="checkpoint" style="left:51%"></div><div class="checkpoint" style="left:77%"></div></div></div>
-    </section>
-
-    <section class="control-area">
-      <div class="section-heading"><div><span class="eyebrow">THE CONTROL DECK</span><h2>YOUR PUPPET. YOUR PROBLEM.</h2></div><div class="controller-actions"><button data-mode="walk" class="small-action active">🚶 WALK</button><button data-mode="cake" class="small-action">🎂 CAKE CARRY</button><button id="demo" class="small-action">▶ WATCH TEAMWORK DEMO</button><button id="reset" class="small-action reset">↻ RESTART RUN</button></div></div>
-      <p id="mode-description" class="mode-description">WALK · LEFT foot needs RIGHT arm + RIGHT lean; RIGHT foot needs LEFT arm + LEFT lean. Bad timing causes slips and faceplants.</p><div class="controls">
-        <div class="control-card leg left-leg"><div class="control-top"><span class="control-symbol">🦵</span><span class="key">A</span></div><h3>LEFT LEG</h3><p>Hold to lift · release to plant</p><button class="pad-btn" data-action="leftLeg" type="button"><span>↑</span> STEP LEFT</button></div>
-        <div class="control-card leg right-leg"><div class="control-top"><span class="control-symbol">🦵</span><span class="key">D</span></div><h3>RIGHT LEG</h3><p>Hold to lift · release to plant</p><button class="pad-btn" data-action="rightLeg" type="button"><span>↑</span> STEP RIGHT</button></div>
-        <div class="control-card arm left-arm"><div class="control-top"><span class="control-symbol">💪</span><span class="key">J</span></div><h3>LEFT ARM</h3><p>Counter-swing during the right-foot step</p><button class="pad-btn" data-action="leftArm" type="button"><span>↗</span> SWING LEFT</button></div>
-        <div class="control-card arm right-arm"><div class="control-top"><span class="control-symbol">💪</span><span class="key">K</span></div><h3>RIGHT ARM</h3><p>Counter-swing during the left-foot step</p><button class="pad-btn" data-action="rightArm" type="button"><span>↗</span> SWING RIGHT</button></div>
-        <div class="control-card balance"><div class="control-top"><span class="control-symbol">⚖️</span><span class="key">← → SPACE</span></div><h3>BODY BALANCE</h3><p>Lean to stay upright · brace to save yourself</p><div class="balance-row"><button class="pad-btn lean" data-action="leanLeft" type="button">←</button><button class="pad-btn lean" data-action="leanRight" type="button">→</button></div><button class="pad-btn brace" data-action="brace" type="button">⚡ BRACE <span id="cooldown"></span></button></div>
-      </div>
-      <div class="tip-bar"><span>💡 COACH'S TERRIBLE ADVICE</span> Left step = HOLD A + K + →, then RELEASE A. Right step = HOLD D + J + ←, then RELEASE D. All three roles must synchronize. Solo spamming cannot win.</div>
-    </section>
-    <footer><span>BUILT FOR LAUGHS. NOT FOR DIGNITY.</span><span>PUPPET PANIC! · TEAMWORK LAB v0.2</span></footer>
-  </main>
-  <dialog id="instructions"><button id="close-help" class="close-help">✕</button><div class="eyebrow">HOW TO OPERATE A HUMAN(ISH)</div><h2>THE ART OF NOT FALLING</h2><p>Every body part is controlled separately. In the future, five friends will operate this one puppet with their phones. For now, try all controls in this single-player lab.</p><ol><li><b>Left step:</b> Hold A + K + RIGHT ARROW for about 0.35 seconds, then release A while holding K and →.</li><li><b>Right step:</b> Hold D + J + LEFT ARROW for about 0.35 seconds, then release D while holding J and ←.</li><li><b>Arms:</b> The opposite arm must counter-swing. In Cake Carry mode, BOTH arms must hold the tray throughout.</li><li><b>Torso:</b> Shift weight toward the planted foot. Wrong direction causes a slip. SPACE braces temporarily but does NOT replace coordination.</li><li><b>Avoid hazards:</b> Time a correctly coordinated lifted foot over the cones, or brace. In Cake Carry, tilting or releasing a hand loses layers.</li><li><b>Recover:</b> Even if you fall, Bongo gets back up in about two seconds. No elimination!</li></ol><p>Tap the large colored buttons if you're using a phone or tablet. For a hands-free demonstration, use <b>WATCH TEAMWORK DEMO</b>.</p></dialog>
-  <script type="module" src="./src/main.js"></script>
+<body style="margin:0;background:#111b33;color:#fff;font:18px system-ui;padding:2rem">
+  <p>Opening PUPPET PANIC!...</p>
+  <p><a style="color:#7ee6d3" href="./host.html">Open multiplayer game</a></p>
 </body>
 </html>

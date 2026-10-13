@@ -4,28 +4,31 @@
 
 A browser party game in active development: 2–25 guests join with their own phones, automatically split into balanced teams controlling one to five puppet characters on a laptop/TV. The physics host and mobile roles are separate; cooperation is mandatory for walking or carrying the cake.
 
-## Current status — public relay implementation prepared, deployment pending
+## Current status — public multiplayer beta; physical device validation pending
 
-- **Solo physics lab:** `index.html` — publicly hosted for single-device movement experiments.
+- **Public entrance:** `/` and `/play.html` open the TV multiplayer host; development pages are not shown in its navigation.
+- **Solo physics lab:** `/lab.html` remains directly accessible for engineering experiments.
 - **TV/host:** `host.html` — real room roster, five-lane race rendering, per-team physics, giant join QR code.
 - **Phone:** `controller.html` — one **role-only, no-scroll** control pad per person.
 - **Local LAN:** `npm run dev` — Node 22+ creates rooms and relays controller inputs/telemetry using HTTP/SSE on your Wi-Fi.
-- **Public internet relay:** Cloudflare Durable Object + WebSocket implementation in `worker/`; **not live until Cloudflare credentials are configured and deployment is performed**.
+- **Public internet relay:** Cloudflare Durable Object + WebSocket implementation in `worker/`, deployed at `https://puppet-panic-relay.adityasuresh2110.workers.dev`. The host connects automatically on GitHub Pages.
 
-The GitHub Pages site serves static HTML/JS and cannot run a room service on its own. Public previews without a connected relay are not multiplayer.
+The GitHub Pages site serves static HTML/JS; Cloudflare operates the live room service. Live cloud protocol tests passed, but a real multi-phone party still requires physical-device testing.
 
 ## Play the solo physics lab
 
-On desktop visit [Puppet Panic on GitHub Pages](https://adityasuresh109.github.io/Puppet-Panic/). To make a valid left step hold **A + K + →** for roughly 0.35 seconds, then release A; for a right step hold **D + J + ←**, then release D. Repeat. Press **Cake Carry** for the challenge requiring both arms to grip the tray. The developer testing lab intentionally shows every button; **actual players use only their assigned phone control pad**.
+For development only, visit [the standalone Solo Lab](https://adityasuresh109.github.io/Puppet-Panic/lab.html). To make a valid left step hold **A + K + →** for roughly 0.35 seconds, then release A; for a right step hold **D + J + ←**, then release D. Repeat. Press **Cake Carry** for the challenge requiring both arms to grip the tray. The developer testing lab intentionally shows every button; **actual players use only their assigned phone control pad**.
 
 ## Multiplayer interfaces
 
+- [Public multiplayer entrance](https://adityasuresh109.github.io/Puppet-Panic/)
 - [Host / TV](https://adityasuresh109.github.io/Puppet-Panic/host.html)
+- [Fresh /play.html route](https://adityasuresh109.github.io/Puppet-Panic/play.html) (avoids previously cached Solo Lab entry)
 - [Phone controller](https://adityasuresh109.github.io/Puppet-Panic/controller.html)
 - [Five-puppet TV-only preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=23)
 - [Balance-pad preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=BALANCE)
 
-A real public room requires a deployed Cloudflare relay URL. The host has a **CONNECT SERVER** input for that one-time URL, which becomes part of the QR invite link so guests need no configuration.
+The public site connects to the Cloudflare relay automatically. The host retains a **CONNECT SERVER** override only for custom testing; guests need no configuration.
 
 ## Team formation
 
@@ -43,15 +46,15 @@ npm run build # static GitHub Pages assets into dist/
 
 ## Cloudflare public relay
 
-The backend uses Durable Objects with SQLite state, authenticated WebSockets, reconnect token rotation, role-scoped inputs, finite room lifetime and stale-control watchdogs. For setup, see [public relay deployment](docs/public-relay.md). A manual Cloudflare account API token must be put in **GitHub Actions repository secrets** (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`); then run the **Deploy public multiplayer relay** workflow. Never paste credentials into the game itself or commit them.
+The backend uses Durable Objects with SQLite state, authenticated WebSockets, reconnect token rotation, role-scoped inputs, finite room lifetime and stale-control watchdogs. For setup, see [public relay deployment](docs/public-relay.md). The repository's GitHub Actions secrets are configured and the relay has been deployed. Its Worker workflow supports the existing `CLOUDFARE_*` secret name aliases. Never paste credentials into the game itself or commit them.
 
-Until that one-time setup, the LAN game works, the static preview works, but cross-network game rooms are **not** publicly reachable.
+Public room creation, two simulated player joins, WebSocket role authorization, live input relay and telemetry passed in the cloud smoke test. Physical-phone and load tests are still pending.
 
 ## Remaining game milestones
 
-1. Actual Cloudflare deployment and public end-to-end WebSocket test with multiple phones.
+1. Browser testing with 2–5 real phones on different networks, then 25-device load testing.
 2. Live player UX: complete five-role coordination, latency/recovery telemetry and role feedback.
-3. Real 25-device load test and team-size fairness study.
+3. Team-size fairness study and gameplay calibration.
 4. Five playable Puppet Olympics events (currently walking and cake carry are prototyped).
 5. Physics animation polish, accessibility, replay highlights and full party launch.
 
