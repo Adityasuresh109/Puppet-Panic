@@ -2,8 +2,10 @@ import {Puppet,STEP,TRACK_LENGTH} from './physics.js';
 import {puppetInputs,ROLE_NAMES,allocateTeams} from './teams.js';
 import {request,snapshot,watchRoom,partyLink,configured} from './transport.js';
 import {renderQr} from './qr.js';
+import {EVENTS,eventById,eventStandings,tallyTournament,secondsText} from './events.js';
+import {callFor,beep} from './announcer.js';
 const $=id=>document.getElementById(id);
-let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false;
+let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[];
 if(!configured()){
  $('relay-setup').hidden=false;
  setTimeout(()=>setError('Connect the public room server to create an online multiplayer party. Local demo previews remain available.'),50);
@@ -15,6 +17,8 @@ $('connect-relay').addEventListener('click',()=>{
  }catch(e){setError(e.message||'Invalid server URL');}
 });
 const canvas=$('tv-canvas'),ctx=canvas.getContext('2d');
+let lastComedy=0,comedyText='',muted=false;
+$('sound-toggle').addEventListener('click',()=>{muted=!muted;$('sound-toggle').textContent=muted?'🔇 SOUND OFF':'🔊 SOUND ON';});
 const api=(path,body={})=>request(path,{code,token,...body});
 function setError(message){$('host-error').textContent=message;}
 function renderLobby(){
@@ -24,6 +28,7 @@ function renderLobby(){
  if(code)try{renderQr($('join-qr'),partyLink(code));}catch(e){console.warn('QR unavailable',e);}$('player-count').textContent=`${room?.players?.length||0} / 25`;
  $('host-status').textContent=room?.phase==='playing'?'LIVE · GAME IN PROGRESS':'LOBBY · JOINING';
  $('host-mode').value=room?.mode||'walk';$('start-match').disabled=(room?.players?.length||0)<2;
+ $('host-mode').disabled=$('host-format').value==='olympics';
  const panel=$('team-preview');panel.replaceChildren();
  if(!room?.teams?.length){const placeholder=document.createElement('p');placeholder.textContent='Invite at least 2 players to create your first puppet.';panel.append(placeholder);}
  for(const team of room?.teams||[]){
@@ -36,17 +41,48 @@ function renderLobby(){
  }
 }
 function initGame(){
- puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:room.mode,lane:t.id}));
+ const event=eventById(room.mode)||EVENTS[0];
+ puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:event.id,lane:t.id}));
  elapsed=0;acc=0;finished=false;inputs.clear();inputSeen.clear();
- $('round-name').textContent=room.mode==='cake'?"DON'T DROP THE CAKE!":"WALK, YOU IDIOTS!";
- $('game-summary').textContent='Every player has a station. Lift, counter-swing and lean together!';
+ let checkpoint=null;try{checkpoint=JSON.parse(sessionStorage.getItem('puppet-game-state')||'null');}catch{sessionStorage.removeItem('puppet-game-state');}
+ if(checkpoint?.code===code&&checkpoint?.mode===room.mode&&Date.now()-checkpoint.savedAt<15*60*1000&&checkpoint.puppets?.length===puppets.length){
+   elapsed=checkpoint.elapsed;
+   puppets.forEach((p,i)=>{Object.assign(p,checkpoint.puppets[i]);p.setInput({leftLeg:false,rightLeg:false,leftArm:false,rightArm:false,lean:0,brace:false});p.prev={...p.input};});
+ }
+ $('round-results').hidden=true;$('next-event').hidden=false;$('tv-canvas').hidden=false;
+ $('round-name').textContent=`${event.icon} ${event.name}`;
+ $('event-counter').textContent=sessionFormat==='olympics'?`EVENT ${eventIndex+1} OF ${EVENTS.length}`:'QUICK CHALLENGE';
+ $('game-summary').textContent=event.instruction;
 }
+function saveHostState(){if(!code||room?.phase!=='playing'||finished)return;
+ sessionStorage.setItem('puppet-game-state',JSON.stringify({code,mode:room.mode,elapsed,savedAt:Date.now(),puppets}));
+}
+function showResults(){
+ if(finished)return;finished=true;sessionStorage.removeItem('puppet-game-state');
+ const event=eventById(room.mode)||EVENTS[0];
+ finalResults=eventStandings(puppets,elapsed,event.seconds);
+ rounds.push({event:room.mode,standings:finalResults});
+ const total=tallyTournament(rounds),hasNext=sessionFormat==='olympics'&&eventIndex+1<EVENTS.length;
+ const final=!hasNext && sessionFormat==='olympics';
+ $('result-title').textContent=final?'🏆 PUPPET OLYMPICS CHAMPIONS':`🏁 ${event.name} · RESULTS`;
+ const cards=$('result-standings');cards.replaceChildren();
+ for(const s of final?total:finalResults){
+  const item=document.createElement('div');item.className='result-team';item.style.setProperty('--team',room.teams.find(t=>t.id===s.teamId)?.color||'#fff');
+  const a=document.createElement('b');a.textContent=`${final?total.indexOf(s)+1:s.rank} PLACE · ${s.name}`;
+  const b=document.createElement('strong');b.textContent=`${s.points} PTS`;
+  const c=document.createElement('small');c.textContent=final?`${s.wins} event wins · ${s.falls} falls`:`${Math.round(s.progress*100)}% completed · ${s.falls} falls · +${s.quality} bonus`;
+  item.append(a,b,c);cards.append(item);
+ }
+ $('round-results').hidden=false;$('tv-canvas').hidden=true;$('next-event').hidden=!hasNext;
+ $('game-summary').textContent=final?'THE PUPPET OLYMPICS HAVE A CHAMPION!':hasNext?'EVENT COMPLETE · NEXT EVENT READY':'CHALLENGE COMPLETE!';
+}
+
 function connect(){if(source)source.close();if(!code||!token)return;
  source=watchRoom(code,token,{
   onMessage(data){
    if(data.type==='room'){
     const wasPlaying=room?.phase==='playing';const originalIds=(room?.teams||[]).map(x=>x.id).join(',');room=data;
-    if(room.phase==='playing'&&(!wasPlaying||originalIds!==room.teams.map(x=>x.id).join(',')))initGame();
+    if(room.phase==='playing'&&(!wasPlaying||!puppets.length||originalIds!==room.teams.map(x=>x.id).join(',')))initGame();
     renderLobby();
    }else if(data.type==='input'){inputs.set(data.playerId,data.controls||{});inputSeen.set(data.playerId,performance.now());}
   },
@@ -60,10 +96,23 @@ $('create-room').addEventListener('click',async()=>{
  }catch(e){setError(e.message);}
 });
 $('host-mode').addEventListener('change',async ev=>{try{await api('mode',{mode:ev.target.value});}catch(e){setError(e.message);}});
-$('start-match').addEventListener('click',async()=>{try{await api('start');}catch(e){setError(e.message);}});
-$('return-lobby').addEventListener('click',async()=>{if(confirm('Return everyone to lobby and reset this round?'))try{await api('reset');}catch(e){alert(e.message);}});
+$('host-format').addEventListener('change',()=>{ $('host-mode').disabled=$('host-format').value==='olympics'; });
+$('start-match').addEventListener('click',async()=>{try{
+  sessionFormat=$('host-format').value; rounds=[];eventIndex=0;finalResults=[];
+  if(sessionFormat==='olympics'&&room.mode!==EVENTS[0].id)await api('mode',{mode:EVENTS[0].id});
+  beep('checkpoint',muted);await api('start');
+ }catch(e){setError(e.message);}});
+$('next-event').addEventListener('click',async()=>{try{
+  if(sessionFormat!=='olympics'||eventIndex>=EVENTS.length-1)return;
+  $('next-event').disabled=true;
+  await api('reset');eventIndex++;
+  await api('mode',{mode:EVENTS[eventIndex].id});
+  await api('start');$('next-event').disabled=false;
+ }catch(e){$('next-event').disabled=false;setError(e.message);alert(e.message);}});
+$('finish-session').addEventListener('click',async()=>{try{sessionStorage.removeItem('puppet-game-state');await api('reset');}catch(e){alert(e.message);}});
+$('return-lobby').addEventListener('click',async()=>{if(confirm('Return everyone to lobby and reset this round?'))try{sessionStorage.removeItem('puppet-game-state');await api('reset');}catch(e){alert(e.message);}});
 let remembered;try{remembered=JSON.parse(sessionStorage.getItem('puppet-host')||'null');}catch{}
-if(remembered){code=remembered.code;token=remembered.token;snapshot(code,token).then(r=>{room=r;renderLobby();connect();}).catch(()=>{sessionStorage.removeItem('puppet-host');code='';token='';});}
+if(remembered){code=remembered.code;token=remembered.token;snapshot(code,token).then(r=>{room=r;if(room.phase==='playing')initGame();renderLobby();connect();}).catch(()=>{sessionStorage.removeItem('puppet-host');code='';token='';});}
 
 const pick=(n,d=1)=>Math.max(0,Math.min(d,n));
 function rounded(x,y,w,h,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
@@ -83,7 +132,7 @@ function drawPuppet(p,x,y,scale){
  ctx.beginPath();ctx.fillStyle='#ffe0a2';ctx.arc(0,-136,35,0,Math.PI*2);ctx.fill();
  for(const s of [-1,1]){ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(s*13,-143,9,11,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#25334e';ctx.beginPath();ctx.arc(s*13,-143,4,0,Math.PI*2);ctx.fill();}
  ctx.fillStyle='#7d3655';ctx.beginPath();ctx.ellipse(0,-121,falling?10:8,falling?12:5,0,0,Math.PI*2);ctx.fill();
- if(p.mode==='cake'){rounded(-45,-99,90,10,4,'#f5e9c7');for(let i=0;i<p.layers;i++)rounded(-30+i*6,-115-i*15,60-i*12,16,5,['#ff99bb','#fbdd93','#9cecd8'][i]);}
+ if(p.activeMode==='cake'){rounded(-45,-99,90,10,4,'#f5e9c7');for(let i=0;i<p.layers;i++)rounded(-30+i*6,-115-i*15,60-i*12,16,5,['#ff99bb','#fbdd93','#9cecd8'][i]);}
  ctx.restore();
 }
 function drawTV(){
@@ -95,6 +144,14 @@ function drawTV(){
   ctx.fillStyle=i%2===0?'#fff2':'#3c5e7e18';ctx.fillRect(0,y,W,laneHeight);
   rounded(0,y+8,245,Math.min(72,laneHeight*.48),9,'#173154d9');ctx.fillStyle=p.color;ctx.font=`900 ${Math.min(19,laneHeight*.20)}px system-ui`;ctx.fillText(p.name,18,y+Math.min(29,laneHeight*.23));
   ctx.fillStyle='#fff';ctx.font=`800 ${Math.min(15,laneHeight*.16)}px system-ui`;ctx.fillText(`${Math.round(p.progress*100)}% · ${p.falls} FALLS · ${p.steps} STEPS`,18,y+Math.min(53,laneHeight*.42));
+  const mode=p.activeMode;
+  if(mode==='climb'){
+    ctx.strokeStyle='#5e85b2';ctx.lineWidth=7;
+    for(const lx of [330,365,1100,1135]){ctx.beginPath();ctx.moveTo(lx,y+laneHeight*.18);ctx.lineTo(lx,trackY);ctx.stroke();}
+    for(let rung=0;rung<5;rung++){ctx.fillStyle='#c9eaf2';ctx.fillRect(340,y+laneHeight*.23+rung*laneHeight*.11,750,4);}
+  }else if(mode==='swing'){
+    for(const rx of [600,930,1180]){ctx.strokeStyle='#a279df';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(rx,y);ctx.lineTo(rx,trackY-18);ctx.stroke();ctx.beginPath();ctx.fillStyle='#f3ca64';ctx.arc(rx,trackY-12,12,0,Math.PI*2);ctx.fill();}
+  }else if(mode==='cake'){ctx.fillStyle='#fff0c9';ctx.font='900 15px system-ui';ctx.fillText(`🍰 ${p.layers} LAYERS`,Math.min(1200,850),y+26);}
   ctx.fillStyle='#93b9b0';ctx.fillRect(0,trackY,1280,7);ctx.fillStyle='#465a7c';ctx.fillRect(0,trackY+7,1280,laneHeight-(trackY-y)-7);
   for(const hazard of [680,1230,1660]){const hx=285+850*(hazard-115)/(TRACK_LENGTH-115);ctx.fillStyle='#ee644d';ctx.beginPath();ctx.moveTo(hx,trackY-21);ctx.lineTo(hx-15,trackY);ctx.lineTo(hx+15,trackY);ctx.fill();}
   const fx=1145;ctx.fillStyle='#ffe29e';ctx.fillRect(fx,trackY-80,7,81);ctx.fillStyle='#fff';ctx.font='800 13px system-ui';ctx.fillText('FINISH',fx-22,trackY-84);
@@ -111,15 +168,22 @@ async function sendTelemetry(){if(!room||room.phase!=='playing')return;
 function frame(ts){if(!last)last=ts;const dt=Math.min(.07,(ts-last)/1000);last=ts;
  if(room?.phase==='playing'&&!finished){acc=Math.min(.12,acc+dt);let ticks=0;
   while(acc>=STEP&&ticks<7){for(const [i,p] of puppets.entries()){
-    const members=room.players.filter(q=>q.teamId===room.teams[i].id).map(q=>({...q,controls:performance.now()-(inputSeen.get(q.id)||0)<1600?inputs.get(q.id)||{}:{}}));
-    p.setInput(puppetInputs(members,room.mode));p.update(STEP);
+    const members=room.players.filter(q=>q.teamId===room.teams[i].id).map(q=>({...q,controls:q.online && performance.now()-(inputSeen.get(q.id)||0)<1600?inputs.get(q.id)||{}:{}}));
+    p.setInput(puppetInputs(members,p.activeMode));p.update(STEP);
+    const notable=p.events.at(-1);
+    if(notable&&notable.id>(p.lastAnnounced||0)){p.lastAnnounced=notable.id;
+      if(['fall','cakeDrop','finish','checkpoint','stage'].includes(notable.type)&&ts-lastComedy>1250){
+        comedyText=callFor(notable,p.name);lastComedy=ts;beep(notable.type,muted);
+      }
+    }
    }elapsed+=STEP;acc-=STEP;ticks++;
   }
   const time=Math.floor(elapsed);$('clock').textContent=`${String(Math.floor(time/60)).padStart(2,'0')}:${String(time%60).padStart(2,'0')}`;
   if(ts-lastTelemetry>400){lastTelemetry=ts;sendTelemetry();}
-  if(puppets.every(p=>p.phase==='finished')||elapsed>200){finished=true;$('game-summary').textContent='ROUND COMPLETE! '+puppets.slice().sort((a,b)=>b.progress-a.progress).map(p=>`${p.name}: ${Math.round(p.progress*100)}%`).join(' | ');}
+  const current=eventById(room.mode)||EVENTS[0];if(puppets.every(p=>p.phase==='finished')||elapsed>=current.seconds)showResults();
  }
- if(!($('host-game').hidden))drawTV();requestAnimationFrame(frame);
+ if(room?.phase==='playing' && !finished && (Math.floor(ts/1000)!==Math.floor((ts-dt*1000)/1000)))saveHostState();
+ if(!($('host-game').hidden)){drawTV();if(comedyText&&ts-lastComedy<2400){rounded(350,12,580,48,12,'#162b52ee');ctx.fillStyle='#ffe6a4';ctx.font='900 22px system-ui';ctx.textAlign='center';ctx.fillText(comedyText.slice(0,53),640,43);ctx.textAlign='start';}}requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 

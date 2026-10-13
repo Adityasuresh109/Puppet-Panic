@@ -1,4 +1,5 @@
 import {allocateTeams,assignPlayers,ACTIONS,MAX_PLAYERS} from '../src/teams.js';
+import {EVENT_IDS} from '../src/events.js';
 
 const ORIGINS=new Set(['https://adityasuresh109.github.io','http://localhost:4173','http://127.0.0.1:4173']);
 const ROOM_TTL=4*60*60*1000;
@@ -53,13 +54,13 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  async save(){await this.ctx.storage.put('room',this.room);}
  alive(){return this.room&&this.room.createdAt+ROOM_TTL>Date.now();}
  auth(token){if(!this.room||typeof token!=='string')return null;if(token===this.room.hostToken)return {host:true};return this.room.players.find(p=>p.token===token)||null;}
- snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
+ snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
  forSockets(fn){for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.authenticated)fn(ws,a);}}
  send(ws,data){try{ws.send(JSON.stringify(data));}catch{}}
  broadcastState(){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(p)this.send(ws,this.snapshot(p));});}
  broadcastHost(data){this.forSockets((ws,a)=>{if(a.host)this.send(ws,data);});}
  broadcastTelemetry(teams){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(!p||p.host)return;const t=teams.find(x=>x.id===p.teamId);if(t)this.send(ws,{type:'telemetry',teamId:t.id,progress:t.progress,unsteady:t.unsteady,expectedSide:t.expectedSide,phase:t.phase,mode:this.room.mode});});}
- rebalance(){if(this.room.phase!=='lobby')return;const players=this.room.players,alloc=assignPlayers(players);for(let i=0;i<players.length;i++){const x=alloc[i],p=players[i];p.teamId=x?.teamId??null;p.teamName=x?.teamName??null;p.teamColor=x?.teamColor??null;p.seat=x?.seat??null;p.role=x?.role??null;p.seq=0;p.controls={};}}
+ rebalance(){if(this.room.phase!=='lobby')return;const players=this.room.players,alloc=assignPlayers(players);for(let i=0;i<players.length;i++){const x=alloc[i],p=players[i];p.teamId=x?.teamId??null;p.teamName=x?.teamName??null;p.teamColor=x?.teamColor??null;p.seat=x?.seat??null;p.role=alloc.filter(t=>t.teamId===x?.teamId)[((x?.seat||0)+(this.room.roundNumber||0))%alloc.filter(t=>t.teamId===x?.teamId).length]?.role??null;p.seq=0;p.controls={};}}
  validatedInput(p,seq,controls){if(this.room.phase!=='playing')throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;const keys=ACTIONS[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!keys.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');p.seq=seq;p.controls=Object.fromEntries(keys.map(k=>[k,controls[k]===true]));this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;}
  async fetch(request){const url=new URL(request.url),path=url.pathname;
   try{
@@ -67,7 +68,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    if(path==='/create'&&request.method==='POST'){
      if(this.alive())return json({error:'Room code collision'},409);
      const {code}=await parse(request);if(!validateCode(code))return json({error:'Invalid room'},400);
-     this.room={code,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',players:[]};
+     this.room={code,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',roundNumber:0,players:[]};
      await this.save();await this.ctx.storage.setAlarm(Date.now()+ROOM_TTL);
      return json({code,token:this.room.hostToken});
    }
@@ -102,7 +103,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    }
    if(!p.host)return json({error:'Host access required'},403);
    if(path==='/mode'&&request.method==='POST'){
-     if(this.room.phase!=='lobby'||!['walk','cake'].includes(body.mode))throw Error('Select the challenge in the lobby');
+     if(this.room.phase!=='lobby'||!EVENT_IDS.includes(body.mode))throw Error('Select the challenge in the lobby');
      this.room.mode=body.mode;await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/start'&&request.method==='POST'){
@@ -110,7 +111,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      this.rebalance();this.room.phase='playing';await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/reset'&&request.method==='POST'){
-     this.room.phase='lobby';this.rebalance();await this.save();this.broadcastState();return json({ok:true});
+     this.room.roundNumber=(this.room.roundNumber||0)+1;this.room.phase='lobby';this.rebalance();await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/telemetry'&&request.method==='POST'){
      if(this.room.phase==='playing'&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),phase:String(x.phase||'').slice(0,20)})));
