@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#111b33"/><title>PUPPET PANIC! — TV Host</title><link rel="stylesheet" href="./room.css"/></head>
+<body class="host-screen"><main class="host-wrap">
+ <header class="tv-top"><div class="logo">✳ PUPPET<span>PANIC!</span></div><div class="tv-badge">LIVE PARTY · 2–25 PLAYERS · MAX 5 PUPPETS</div><div id="host-status" class="tv-badge">ROOM SETUP</div></header>
+ <section id="host-setup" class="tv-lobby"><div class="host-hero"><h1>EVERYBODY GETS<br/>A BODY PART.</h1><p>Phones are controllers. This screen is the stage.</p><button class="host-action primary" id="create-room">CREATE PARTY ROOM</button><p id="host-error" class="host-error"></p></div>
+  <section id="room-panel" hidden><div class="room-ticket"><div><span>ROOM CODE</span><strong id="room-code">------</strong><p>Join on your phone: <b id="join-link"></b></p></div><div class="count-box"><strong id="player-count">0 / 25</strong><span>JOINED PLAYERS</span></div></div>
+  <div class="stage-heading"><h2>TEAM PREVIEW</h2><p>Teams rebalance automatically until you press Start.</p></div><div id="team-preview" class="team-preview"></div>
+  <div class="host-actions"><label>CHALLENGE <select id="host-mode"><option value="walk">🚶 WALK, YOU IDIOTS!</option><option value="cake">🎂 DON'T DROP THE CAKE!</option></select></label><button id="start-match" class="host-action primary" disabled>START WHEN EVERYONE IS READY</button></div></section>
+ </section>
+ <section id="host-game" hidden><div class="game-topline"><h1 id="round-name">WALK, YOU IDIOTS!</h1><div><span id="clock">00:00</span><button class="host-action small" id="return-lobby">BACK TO LOBBY</button></div></div><canvas id="tv-canvas" width="1280" height="720" aria-label="Five team puppets competing in lanes"></canvas><div id="game-summary" class="game-summary">Keep your eyes on the TV. Coordinate your body parts!</div></section>
+ <footer class="host-footer"><span>THE ROOM CONTROLS THE PUPPETS. THE HOST RUNS THE WORLD.</span><a href="./">OPEN SOLO LAB</a></footer>
+</main><script type="module" src="./src/host.js"></script></body></html>

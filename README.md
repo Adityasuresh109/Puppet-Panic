@@ -83,3 +83,27 @@ Local keyboard walkthrough (five independent roles in the future mobile version)
 The screen shows the required next foot, combo, balance danger, and cake layers. `npm test` includes exploit-regression tests for missing or incorrect team inputs. This is still a local one-puppet lab; **phone roles, 23-player connection and real-device tests are not yet implemented**.
 
 Full design rationale: [Coordination-first game design](docs/coordination-first.md).
+
+
+## Party display + role controller split (early LAN prototype)
+
+The default URL remains the **solo physics lab** used for debugging; **real players must not use that scrollable control deck**. The new separation is:
+
+- TV/host: `host.html` — creates a room and renders up to five simultaneous puppets (never player control buttons).
+- Players: `controller.html` — enter room code + name, receive **one** assigned station, and see only its 1–3 large controls in a full-height, no-scroll layout.
+- Lab: `index.html` — retains the original all-input testing panel.
+
+**Team allocation: 2–25 players, maximum five puppets.** Use `ceil(n/5)` puppets and balance sizes by at most one player. 2–5 players create one co-op puppet. 6→3+3; 7→4+3; 9→5+4; 11→4+4+3; 15→5+5+5; 16→4+4+4+4; 19→5+5+5+4; 23→5+5+5+4+4; 25→5×5. See `docs/multiplayer-ux.md` for every possible split and role mapping.
+
+### Run actual networked controllers on local Wi-Fi
+
+Run `npm run dev` with Node.js 22+ on the host laptop. On that laptop visit `http://<HOST-LAN-IP>:4173/host.html` (substitute its actual local IPv4 address). All player phones must be on the same Wi-Fi and open `http://<HOST-LAN-IP>:4173/controller.html?room=<ROOM-CODE>`. Join and start from the TV host. Host computer is authoritative for physics; the local server relays role-limited control changes and assignment updates over HTTP + SSE, with tokens for each guest.
+
+**GitHub Pages hosts static files, not this Node.js room server.** It cannot yet accept real internet multiplayer joins. Public Pages links for UI review only:
+
+- [Five-puppet TV preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=23)
+- [Three-puppet TV preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=15)
+- [Body-balance phone controller preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=BALANCE)
+- [Two-player both-legs phone preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=DUAL_LEGS)
+
+**Honest readiness:** allocation + LAN room server + role-specific UI are built and automated-tested. A 2–25-device human playtest, final physics balance between unequal team sizes, and a **public production HTTPS/WSS relay** are not yet complete. The Pages host Create Room action requires a relay and therefore does not work on Pages yet.
