@@ -1,0 +1,27 @@
+name: Live Cloudflare multiplayer smoke test
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/cloud-smoke.mjs"
+      - "src/transport.js"
+      - "worker/**"
+      - ".github/workflows/cloud-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test public room relay end to end
+        env:
+          PUPPET_RELAY_URL: https://puppet-panic-relay.adityasuresh2110.workers.dev
+        run: node scripts/cloud-smoke.mjs

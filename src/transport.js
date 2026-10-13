@@ -7,8 +7,9 @@ function validRelay(value){
 }
 const chosen=new URL(location.href).searchParams.get('relay');
 if(chosen&&validRelay(chosen))sessionStorage.setItem(KEY,validRelay(chosen));
-/** Static GitHub Pages defaults to an unset relay until owner configures Worker URL. */
-export const RELAY=validRelay(chosen)||validRelay(globalThis.PUPPET_RELAY_URL)||validRelay(sessionStorage.getItem(KEY))||'';
+/** Deployed GitHub Pages uses the verified public Worker; local builds default to LAN server. */
+const DEFAULT_PUBLIC_RELAY = location.hostname==='adityasuresh109.github.io' ? 'https://puppet-panic-relay.adityasuresh2110.workers.dev' : '';
+export const RELAY=validRelay(chosen)||validRelay(globalThis.PUPPET_RELAY_URL)||validRelay(sessionStorage.getItem(KEY))||DEFAULT_PUBLIC_RELAY;
 export const CLOUD=Boolean(RELAY);
 export function configured(){return Boolean(RELAY)||['localhost','127.0.0.1'].includes(location.hostname);}
 export function partyLink(code){const u=new URL('./controller.html',location.href);u.searchParams.set('room',code);u.searchParams.delete('preview');if(RELAY)u.searchParams.set('relay',RELAY);return u.toString();}
