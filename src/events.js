@@ -19,11 +19,16 @@ export function eventStandings(puppets,elapsed,limit){
   });
   const base=[100,80,65,50,40];
   return sorted.map((p,i)=>{
-    const completed=p.finishedAt!==null;
-    const quality=Math.max(0,20-(p.falls*4)-(p.mode==='cake'||p.mode==='finale'?(3-p.layers)*5:0));
+    const completed=p.finishedAt!==null,progress=clamp01(p.progress);
+    const quality=progress===0&&!completed?0:Math.max(0,20-(p.falls*4)-(p.mode==='cake'||p.mode==='finale'?(3-p.layers)*5:0));
+    const previous=sorted.slice(0,i).findIndex(other=>{
+      if((other.finishedAt!==null)!==completed)return false;
+      return completed?Math.abs(other.finishedAt-p.finishedAt)<.25:Math.abs(other.progress-progress)<.001&&other.falls===p.falls;
+    });
+    const rank=previous>=0?previous+1:i+1;
     const multiplier=p.mode==='finale'?1.5:1;
-    const points=Math.round((base[i]+quality)*multiplier);
-    return {teamId:p.lane,name:p.name,rank:i+1,points,quality,completed,progress:clamp01(p.progress),falls:p.falls,layers:p.layers,seconds:completed?p.finishedAt:Math.min(elapsed,limit)};
+    const points=progress===0&&!completed?0:Math.round((base[rank-1]+quality)*multiplier);
+    return {teamId:p.lane,name:p.name,rank,points,quality,completed,progress,falls:p.falls,layers:p.layers,seconds:completed?p.finishedAt:Math.min(elapsed,limit)};
   });
 }
 export function tallyTournament(rounds){
