@@ -1,6 +1,13 @@
 name: Deploy public multiplayer relay
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - "wrangler.toml"
+      - "src/teams.js"
+      - ".github/workflows/deploy-relay.yml"
 
 permissions:
   contents: read
@@ -10,17 +17,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check Cloudflare credentials
+      - name: Check Cloudflare connection
+        id: connection
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          test -n "$CF_API_TOKEN" || { echo "Set repository secret CLOUDFLARE_API_TOKEN"; exit 1; }
-          test -n "$CF_ACCOUNT_ID" || { echo "Set repository secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          if [ -n "$CF_API_TOKEN" ] && [ -n "$CF_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare credentials found. Deploying Puppet Panic relay."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare credentials are not set. Skipping cloud deployment (static site remains available)."
+          fi
       - name: Deploy Cloudflare Worker and Durable Object
+        if: steps.connection.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
+        id: cloudflare
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
           wranglerVersion: '4'
+      - name: Show public health endpoint
+        if: steps.connection.outputs.ready == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.cloudflare.outputs.deployment-url }}
+        run: |
+          if [ -n "$DEPLOYMENT_URL" ]; then
+            echo "Public relay: $DEPLOYMENT_URL"
+            curl --fail --silent --show-error --retry 5 --retry-delay 2 "${DEPLOYMENT_URL%/}/health"
+          fi
