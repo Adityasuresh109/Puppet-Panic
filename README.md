@@ -67,3 +67,19 @@ Original game artwork, rendering code and synthesized sound have no third-party 
 - Local scripted browser interaction has been validated; a real multi-person playtest and cross-device mobile QA are pending.
 - No live multi-device service or final production URL has been deployed by this commit.
 - This browser-only physics proof-of-concept is a deliberate zero-dependency stepping stone toward the planned Phaser/modern physics engine.
+
+## Teamwork Lab v0.2 (coordination rework)
+
+**Update following player feedback:** the original lab could be completed by spamming any leg button. That loophole has been removed: only correctly sequenced, assisted steps advance the puppet. Arms alone never propel it. A valid planted foot needs the **next** leg, a 0.22–0.78-second lift, the **opposite arm**, and a weight transfer toward the **supporting** leg.
+
+Local keyboard walkthrough (five independent roles in the future mobile version):
+
+1. **LEFT step**: Hold **A + K + →** together for approximately 0.35 seconds. Release **A** while keeping the arm and lean briefly engaged.
+2. **RIGHT step**: Hold **D + J + ←** together for approximately 0.35 seconds. Release **D** while keeping the arm and lean briefly engaged.
+3. Alternate. Repeating one foot, neglecting an arm/torso controller, raising both feet, or mistiming the plant causes slips and faceplants, not automatic forward motion.
+4. Press **CAKE CARRY** to play a second prototype challenge: both arm controls must grip the tray while leg players and the torso player coordinate. Tilt or drop the cake and lose layers/progress.
+5. **WATCH AI DEMO** demonstrates a scripted *coordinated sequence*, not independent AI teammates or multiplayer.
+
+The screen shows the required next foot, combo, balance danger, and cake layers. `npm test` includes exploit-regression tests for missing or incorrect team inputs. This is still a local one-puppet lab; **phone roles, 23-player connection and real-device tests are not yet implemented**.
+
+Full design rationale: [Coordination-first game design](docs/coordination-first.md).
