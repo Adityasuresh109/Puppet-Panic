@@ -1,65 +1,53 @@
-# PUPPET PANIC! 🎭💥
+# PUPPET PANIC! 🎭🏆
 
-**Five puppets. Up to twenty-five friends. Nobody owns the whole body.**
+**Five puppets. Up to 25 players. Absolutely nobody controls a whole body.**
 
-A browser party game in active development: 2–25 guests join with their own phones, automatically split into balanced teams controlling one to five puppet characters on a laptop/TV. The physics host and mobile roles are separate; cooperation is mandatory for walking or carrying the cake.
+PUPPET PANIC! is a multiplayer phone-and-TV party game for 2–25 friends in a single room. Friends join a room code or QR on their phones; the host runs animated physics on the laptop/TV. Teams divide into one to five puppets, with every phone operating assigned limbs or balance controls. Cooperation is required to move at all.
 
-## Current status — public multiplayer beta; physical device validation pending
+## Current release: v1.0.0-rc.1 (testing, not stable v1.0)
 
-- **Public entrance:** `/` and `/play.html` open the TV multiplayer host; development pages are not shown in its navigation.
-- **Solo physics lab:** `/lab.html` remains directly accessible for engineering experiments.
-- **TV/host:** `host.html` — real room roster, five-lane race rendering, per-team physics, giant join QR code.
-- **Phone:** `controller.html` — one **role-only, no-scroll** control pad per person.
-- **Local LAN:** `npm run dev` — Node 22+ creates rooms and relays controller inputs/telemetry using HTTP/SSE on your Wi-Fi.
-- **Public internet relay:** Cloudflare Durable Object + WebSocket implementation in `worker/`, deployed at `https://puppet-panic-relay.adityasuresh2110.workers.dev`. The host connects automatically on GitHub Pages.
+The five-event Puppet Olympics game loop, scoreboard, role-specific phone controls, public Cloudflare relay, automatic team balancing, role rotation and host results screen are implemented. **The game is not yet certified v1.0**: the 25-device validation, human playtest and cross-platform reliability gates in [the release candidate document](docs/release-candidate.md) are still pending.
 
-The GitHub Pages site serves static HTML/JS; Cloudflare operates the live room service. Live cloud protocol tests passed, but a real multi-phone party still requires physical-device testing.
+## Launch multiplayer
 
-## Play the solo physics lab
+- [Open the official TV host](https://adityasuresh109.github.io/Puppet-Panic/)
+- [Alternate host link](https://adityasuresh109.github.io/Puppet-Panic/play.html)
+- [Controller join page](https://adityasuresh109.github.io/Puppet-Panic/controller.html)
 
-For development only, visit [the standalone Solo Lab](https://adityasuresh109.github.io/Puppet-Panic/lab.html). To make a valid left step hold **A + K + →** for roughly 0.35 seconds, then release A; for a right step hold **D + J + ←**, then release D. Repeat. Press **Cake Carry** for the challenge requiring both arms to grip the tray. The developer testing lab intentionally shows every button; **actual players use only their assigned phone control pad**.
+Create a party room on your laptop, put the host page on the TV, invite players via QR, and choose **Full Puppet Olympics** (all five stages) or **Quick Challenge** (one stage). Each phone receives its own no-scroll controls. Teams form automatically: 2→2; 8→4+4; 9→5+4; 15→5+5+5; 16→4+4+4+4; 19→5+5+5+4; 23→5+5+5+4+4; 25→5+5+5+5+5.
 
-## Multiplayer interfaces
+### Challenges
 
-- [Public multiplayer entrance](https://adityasuresh109.github.io/Puppet-Panic/)
-- [Host / TV](https://adityasuresh109.github.io/Puppet-Panic/host.html)
-- [Fresh /play.html route](https://adityasuresh109.github.io/Puppet-Panic/play.html) (avoids previously cached Solo Lab entry)
-- [Phone controller](https://adityasuresh109.github.io/Puppet-Panic/controller.html)
-- [Five-puppet TV-only preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=23)
-- [Balance-pad preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=BALANCE)
+1. Walk, You Idiots! — coordinate alternating feet, opposite arm and torso.
+2. Don't Drop the Cake! — maintain both grips, stabilize the tray, save its three layers.
+3. The Impossible Climb — secure handholds and carefully transfer weight along the obstacle tower.
+4. Swing for Your Life — keep both hands gripping and pump through rope crossings.
+5. Puppet Olympics Finale — sprint, cake and climb sections, with a 1.5× point multiplier.
 
-The public site connects to the Cloudflare relay automatically. The host retains a **CONNECT SERVER** override only for custom testing; guests need no configuration.
+All five events are available in the current build. Stage-specific gameplay, physics difficulty, and the fairness of 2-, 3-, 4-, and 5-person teams require further human testing; currently the rig uses assisted custom physics rather than a full rigid-body solver.
 
-## Team formation
+## Rules
 
-Use the smallest number of puppets (`ceil(playerCount/5)`) and balance the numbers among them. Examples: 2→2; 6→3+3; 9→5+4; 15→5+5+5; 16→4+4+4+4; 19→5+5+5+4; 23→5+5+5+4+4; 25→5+5+5+5+5. At most five puppets are rendered. For 2 people, one controls both legs and the other the upper body. For 5, every limb and the torso has a distinct controller. Four-player teams combine both legs onto one controller, while three-player teams divide legs, arms, and balance.
+- Room size 2–25, host is separate and doesn't count as a player.
+- Number of puppets = `ceil(players / 5)`, balanced sizes within one player.
+- Event ends when all puppets finish or the time limit expires.
+- Finishing teams place ahead of unfinished teams; standings award 100/80/65/50/40 plus up to 20 objective-quality points. The finale awards 1.5×; cumulative points decide the champion.
+- Roles rotate between rounds. No team is permanently eliminated.
 
-## Development and tests
+## Development
 
-Requires Node.js 22 or later. The game and local server currently have no npm runtime dependencies.
+Requires Node 22+ and no mandatory paid runtime services.
 
 ```bash
-npm run dev   # LAN rooms, host and phones at http://localhost:4173
-npm test      # pure physics + allocation + local HTTP + cloud Durable Object mock tests
-npm run build # static GitHub Pages assets into dist/
+npm run dev     # local LAN server at http://localhost:4173
+npm test        # physics, relay, teams, security, stage and release-contract tests
+npm run build   # production static build to dist/
 ```
 
-## Cloudflare public relay
+GitHub Pages hosts static files; Cloudflare Durable Objects hosts the public WebSocket relay. The host is authoritative for physics and scoring. Mobile browsers submit only role-scoped inputs. The development-only Solo Lab lives at `/lab.html`, with no public navigation shortcut.
 
-The backend uses Durable Objects with SQLite state, authenticated WebSockets, reconnect token rotation, role-scoped inputs, finite room lifetime and stale-control watchdogs. For setup, see [public relay deployment](docs/public-relay.md). The repository's GitHub Actions secrets are configured and the relay has been deployed. Its Worker workflow supports the existing `CLOUDFARE_*` secret name aliases. Never paste credentials into the game itself or commit them.
+## Limitations
 
-Public room creation, two simulated player joins, WebSocket role authorization, live input relay and telemetry passed in the cloud smoke test. Physical-phone and load tests are still pending.
+Read [release verification requirements](docs/release-candidate.md), [technical spec](docs/technical-game-spec.md) and [cloud relay setup](docs/public-relay.md). We won't call this a verified v1.0 until it is reliably playable by people on 25 real devices, including phone/browser and connection recovery tests.
 
-## Remaining game milestones
-
-1. Browser testing with 2–5 real phones on different networks, then 25-device load testing.
-2. Live player UX: complete five-role coordination, latency/recovery telemetry and role feedback.
-3. Team-size fairness study and gameplay calibration.
-4. Five playable Puppet Olympics events (currently walking and cake carry are prototyped).
-5. Physics animation polish, accessibility, replay highlights and full party launch.
-
-See [the game spec](docs/technical-game-spec.md), [multiplayer UX](docs/multiplayer-ux.md), and [third-party licenses](docs/third-party-licenses.md).
-
-## License
-
-The project's original code has not been explicitly open-source licensed by the project owner. Its package is marked `UNLICENSED`. The QR renderer uses a separately licensed open-source implementation; see third-party notices. No paid game runtime or third-party illustration assets are required by this prototype.
+The original code has no granted open-source license (`UNLICENSED`). Third-party dependencies preserve their own license notices; see project documentation.

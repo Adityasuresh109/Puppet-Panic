@@ -39,9 +39,15 @@ export class Puppet {
     this.hands = { left: point(this.x - 45, -84), right: point(this.x + 45, -84) };
     this.face = 'smile'; this.smileTimer = 0;
     this.layers = 3; this.cakeAngle = 0; this.cakeWobble = 0; this.gripLoss = 0;
+    this.ropeTension = 0; this.ropeMisses = 0; this.lastStage = this.activeMode;
+  }
+  get activeMode() {
+    if(this.mode!=='finale') return this.mode;
+    const p=(this.best-115)/(TRACK_LENGTH-115);
+    return p<1/3?'walk':p<2/3?'cake':'climb';
   }
   setMode(mode) {
-    if (!['walk', 'cake'].includes(mode)) throw new Error('Unknown challenge');
+    if (!['walk', 'cake', 'climb', 'swing', 'finale'].includes(mode)) throw new Error('Unknown challenge');
     this.mode = mode; this.reset();
   }
   setInput(update) {
@@ -91,16 +97,16 @@ export class Puppet {
     if (this.missteps >= 3 || this.unsteady > 1.05) this.fall('misstep');
   }
   plant(side) {
-    const i = this.input, elapsed = this.holdTime[side];
+    const i = this.input, elapsed = this.holdTime[side], challenge = this.activeMode;
     const other = oppose(side);
     const correctTurn = this.expectedSide === side;
-    const timed = elapsed >= .22 && elapsed <= .78;
+    const timed = elapsed >= (challenge==='swing'?.30:.22) && elapsed <= (challenge==='swing'?.72:.78);
     const plantedSupport = !i[sideKey(other)];
     // Weight goes towards the supporting leg; the opposite arm counters angular momentum.
     const weightSign = side === 'left' ? 1 : -1;
     const correctWeight = this.weightQuality[side] >= .68 && i.lean * weightSign > .6;
     const correctArms = this.supportQuality[side] >= .68 &&
-      (this.mode === 'cake'
+      (['cake','swing'].includes(challenge)
         ? (i.leftArm && i.rightArm)
         : (i[`${other}Arm`] && !i[`${side}Arm`]));
     this.holdTime[side] = 0; this.supportQuality[side] = 0; this.weightQuality[side] = 0;
@@ -108,14 +114,16 @@ export class Puppet {
     if (!timed) { this.slip('bad-timing', side); return; }
     if (!plantedSupport) { this.slip('no-support', side); return; }
     if (!correctWeight) { this.slip('weight-transfer', side); return; }
-    if (!correctArms) { this.slip(this.mode === 'cake' ? 'cake-grip' : 'arm-sync', side); return; }
+    if (!correctArms) { this.slip(challenge === 'cake' ? 'cake-grip' : 'arm-sync', side); return; }
+    // Hanging requires controlled tension; dropping hands while crossing costs momentum.
+    if(challenge==='swing' && !(i.leftArm&&i.rightArm)){this.slip('rope-grip',side);return;}
     this.expectedSide = other;
     this.steps++; this.combo++; this.missteps = 0;
     this.unsteady = Math.max(.03, this.unsteady - .2);
-    this.vx = clamp(this.vx + (this.mode === 'cake' ? 54 : 65) + Math.min(this.combo, 4) * 3, 0, MAX_SPEED);
+    this.vx = clamp(this.vx + (challenge==='cake'?54:challenge==='climb'?50:challenge==='swing'?77:65) + Math.min(this.combo,4)*3, 0, MAX_SPEED);
     this.angularVelocity += (side === 'left' ? .33 : -.33);
     this.face = 'grin'; this.smileTimer = .3;
-    this.emit('step', { side, combo: this.combo, mode: this.mode });
+    this.emit('step', { side, combo: this.combo, mode: challenge });
   }
   update(dt = STEP) {
     dt = clamp(dt, 0, .035);
@@ -134,7 +142,8 @@ export class Puppet {
       if (this.fallTimer <= 0) this.recover();
       this.updateLimbs(dt); this.prev = { ...this.input }; return;
     }
-    const i = this.input, p = this.prev;
+    const i = this.input, p = this.prev, challenge=this.activeMode;
+    if(this.lastStage!==challenge){this.lastStage=challenge;this.emit('stage',{mode:challenge});this.gripLoss=0;this.cakeWobble=0;}
     if (i.brace && !p.brace && this.cooldown <= 0) {
       this.braceTime = .55; this.cooldown = 3.2; this.emit('brace');
     }
@@ -149,7 +158,7 @@ export class Puppet {
       if (i[key]) {
         this.holdTime[side] += dt;
         const weightSign = side === 'left' ? 1 : -1;
-        const armsOK = this.mode === 'cake'
+        const armsOK = ['cake','swing'].includes(challenge)
           ? (i.leftArm && i.rightArm)
           : (i[`${other}Arm`] && !i[`${side}Arm`]);
         const weightOK = i.lean * weightSign > .6;
@@ -167,7 +176,7 @@ export class Puppet {
     else if (!i.leftLeg && !i.rightLeg) this.unsteady = Math.max(0, this.unsteady - dt * .08);
     // Angular movement uses actual player input. Without counterweight, unsupported swings topple.
     const raisedSide = i.leftLeg !== i.rightLeg ? (i.leftLeg ? 'left' : 'right') : null;
-    const armTorque = (Number(i.leftArm) - Number(i.rightArm)) * (this.mode === 'cake' ? .08 : .6);
+    const armTorque = (Number(i.leftArm) - Number(i.rightArm)) * (['cake','swing'].includes(challenge) ? .08 : .6);
     const legTorque = raisedSide === 'left' ? -.95 : raisedSide === 'right' ? .95 : 0;
     const torsoTorque = -i.lean * 1.25;
     this.angularVelocity += (legTorque + armTorque + torsoTorque - this.tilt * 1.25) * dt;
@@ -175,17 +184,25 @@ export class Puppet {
     this.tilt = clamp(this.tilt + this.angularVelocity * dt, -2.7, 2.7);
     this.unsteady += Math.max(0, Math.abs(this.tilt) - .24) * dt * .65;
     // Crashes bleed speed; maintaining forward momentum needs new synchronized steps.
-    this.vx *= Math.pow(this.mode === 'cake' ? .965 : .970, dt * 60);
+    this.vx *= Math.pow(challenge === 'cake' ? .965 : challenge==='climb'?.945 : challenge==='swing'?.966 : .970, dt * 60);
     this.x = Math.max(80, this.x + this.vx * dt);
     if (Math.abs(this.tilt) > (braced ? .83 : .68) || this.unsteady > 1.05) this.fall('balance');
-    if (this.mode === 'cake' && this.phase === 'running') this.updateCake(dt);
+    if (challenge === 'cake' && this.phase === 'running') this.updateCake(dt);
+    if(challenge==='climb' && this.phase==='running' && this.steps>0 && !i.leftArm&&!i.rightArm){this.unsteady+=dt*.75;this.vx*=.96;}
+    if(challenge==='swing' && this.phase==='running'){
+      // A rope crossing requires BOTH hands to remain on the rope while legs pump.
+      const ropeReady=i.leftArm&&i.rightArm;
+      if(this.steps>0 && !ropeReady && this.vx>15){this.ropeTension+=dt;this.unsteady+=dt*1.8;}
+      else this.ropeTension=Math.max(0,this.ropeTension-dt*2);
+      if(this.ropeTension>.60){this.fall('missed-rope');this.ropeTension=0;this.ropeMisses++;this.x=this.checkpoint;}
+    }
     if (this.phase === 'running') {
       // Ground hazards require a properly prepared step; slamming the cone is not harmless.
-      for (const ox of [680, 1230, 1660]) {
+      for (const ox of (challenge==='climb'?[620,1140,1600]:challenge==='swing'?[710,1310,1710]:[680,1230,1660])) {
         if (this.x > ox - 10 && this.x < ox + 10 && this.vx > 20 && !raisedSide && !braced && this.time - this.lastEventAt > .4) {
           this.unsteady += .36; this.vx *= .3;
           this.emit('bonk', { obstacle: ox });
-          if (this.mode === 'cake') this.damageCake('collision');
+          if (challenge === 'cake') this.damageCake('collision');
           else this.fall('obstacle');
           break;
         }
@@ -253,7 +270,7 @@ export class Puppet {
     if (this.phase === 'finished') return 'FINISHED!';
     if (this.phase === 'fallen') return 'FACEPLANT!';
     if (this.unsteady > .65) return 'LOSING BALANCE!';
-    return this.mode === 'cake' ? `CAKE: ${this.layers} LAYERS` : `NEXT: ${this.expectedSide.toUpperCase()} FOOT`;
+    return this.activeMode === 'cake' ? `CAKE: ${this.layers} LAYERS` : this.activeMode==='climb'?`GRIP & CLIMB: ${this.expectedSide.toUpperCase()}`:this.activeMode==='swing'?`ROPE PUMP: ${this.expectedSide.toUpperCase()}`:`NEXT: ${this.expectedSide.toUpperCase()} FOOT`;
   }
 }
 export function ranking(puppets) {

@@ -51,7 +51,7 @@ export function puppetInputs(players,mode='walk'){
         const left=v('leanLeft'),right=v('leanRight'),grip=v('grip');
         input.lean+=Number(right)-Number(left);
         // Two-player mode merges swing into deliberate weight transfer, not passive autopilot.
-        if(mode==='cake'){input.leftArm ||=grip;input.rightArm ||=grip;}
+        if(mode==='cake'||mode==='finale'||mode==='swing'){input.leftArm ||=grip;input.rightArm ||=grip;}
         else {input.leftArm ||=left;input.rightArm ||=right;}
         input.brace ||=v('brace');break;
       }

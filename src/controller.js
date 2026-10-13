@@ -1,4 +1,5 @@
 import {ACTIONS,ROLE_NAMES} from './teams.js';
+import {eventById} from './events.js';
 import {request,snapshot,watchRoom,configured} from './transport.js';
 const $=id=>document.getElementById(id);
 const params=new URL(location.href).searchParams;
@@ -14,7 +15,7 @@ function updateMode(){const p=assigned();if(!p)return;
  $('role-screen').classList.toggle('waiting',room.phase!=='playing');
  $('team-indicator').style.background=p.teamColor||'#7f90ab';$('team-name').textContent=p.teamName||'TEAM FORMING';$('role-label').textContent=ROLE_NAMES[p.role]||'WAITING FOR TEAM';
  $('room-footer').textContent=`ROOM ${code}`;
- $('scenario').textContent=room.phase==='lobby'?'LOBBY · TEAMS MAY CHANGE':room.mode==='cake'?'🎂 CAKE CARRY':'🚶 WALK CHALLENGE';
+ $('scenario').textContent=room.phase==='lobby'?'LOBBY · TEAMS MAY CHANGE':`${eventById(room.mode)?.icon||'🎭'} ${eventById(room.mode)?.name||'PUPPET PANIC'}`;
  $('cue').textContent=!p.role?'NEED 2 PLAYERS':room.phase!=='playing'?'WAIT FOR HOST':lastTelemetry?cueText(p,lastTelemetry):'WATCH THE TV';
  const wanted=ACTIONS[p.role]||[];
  if($('pad-area').dataset.role!==p.role||$('pad-area').dataset.mode!==room.mode){
@@ -23,7 +24,7 @@ function updateMode(){const p=assigned();if(!p)return;
  }
  $('phone-hint').textContent=room.phase==='playing'?'THUMBS ON BUTTONS · EYES ON TV':'YOUR ROLE LOCKS WHEN THE HOST STARTS';
 }
-function cueText(p,t){if(t.phase==='finished')return 'YOU FINISHED!';if(t.phase==='fallen')return 'FACEPLANT! RECOVER!';if(t.unsteady>.68)return 'DANGER! STEADY!';if(room.mode==='cake'&&(p.role.includes('ARM')||p.role==='UPPER_BODY'))return 'KEEP THE CAKE LEVEL!';return `${(t.expectedSide||'left').toUpperCase()} FOOT NEXT`;
+function cueText(p,t){if(t.phase==='finished')return 'YOU FINISHED!';if(t.phase==='fallen')return 'FACEPLANT! RECOVER!';if(t.unsteady>.68)return 'DANGER! STEADY!';if((room.mode==='cake'||room.mode==='finale'&&t.progress>.33&&t.progress<.67)&&(p.role.includes('ARM')||p.role==='UPPER_BODY'))return 'KEEP THE CAKE LEVEL!';if(room.mode==='swing')return 'GRIP ROPE + PUMP IN RHYTHM!';if(room.mode==='climb')return 'SECURE HANDHOLD + STEP!';return `${(t.expectedSide||'left').toUpperCase()} FOOT NEXT`;
 }
 function button(text,emoji,action,color,wide=false,hint='HOLD • RELEASE'){
  const b=document.createElement('button');b.type='button';b.className=`pad-button ${color}${wide?' wide':''}`;b.dataset.action=action;
@@ -34,7 +35,7 @@ function button(text,emoji,action,color,wide=false,hint='HOLD • RELEASE'){
  b.addEventListener('contextmenu',e=>e.preventDefault());return b;
 }
 function buildPad(actions,role,mode){const pad=$('pad-area');pad.replaceChildren();pad.className='pad-area '+(actions.length===2?'grid-two':actions.length>=3?'grid-three':'');
- const configs={leftLeg:['LEFT STEP','🦵','amber'],rightLeg:['RIGHT STEP','🦵','orange'],leftArm:[mode==='cake'?'LEFT GRIP':'SWING LEFT','💪','blue'],rightArm:[mode==='cake'?'RIGHT GRIP':'SWING RIGHT','💪','purple'],leanLeft:['LEAN LEFT','⬅','green'],leanRight:['LEAN RIGHT','➡','green'],brace:['BRACE','⚡','red'],grip:['GRIP BOTH','🎂','purple']};
+ const configs={leftLeg:['LEFT STEP','🦵','amber'],rightLeg:['RIGHT STEP','🦵','orange'],leftArm:[['cake','swing','finale'].includes(mode)?'LEFT GRIP':'SWING LEFT','💪','blue'],rightArm:[['cake','swing','finale'].includes(mode)?'RIGHT GRIP':'SWING RIGHT','💪','purple'],leanLeft:['LEAN LEFT','⬅','green'],leanRight:['LEAN RIGHT','➡','green'],brace:['BRACE','⚡','red'],grip:['GRIP BOTH','🎂','purple']};
  for(const a of actions){const [label,emoji,color]=configs[a];const wide=actions.length===3&&a===actions[2];pad.append(button(label,emoji,a,color,wide,a==='brace'?'USE WHEN WOBBLY':a==='grip'?'HOLD BOTH HANDS':'HOLD • RELEASE'));}
 }
 function setControl(key,value){if(controls[key]===value)return;controls[key]=value;if(isPreview)return;sendInput();}
@@ -48,7 +49,7 @@ setInterval(()=>{if(room?.phase==='playing'&&Object.values(controls).some(Boolea
 function openStream(){if(source)source.close();source=watchRoom(code,token,{
   onConnection(state){$('connection').textContent=state==='connected'?'● CONNECTED':state==='connecting'?'● CONNECTING':'● RECONNECTING';$('connection').classList.toggle('offline',state!=='connected');if(state!=='connected')releaseAll();},
   onMessage(data){
-   if(data.type==='room'){const prevRole=assigned()?.role;room=data;if(prevRole&&prevRole!==assigned()?.role)releaseAll();updateMode();}
+   if(data.type==='room'){const prevRole=assigned()?.role;const oldMode=room?.mode;room=data;if(oldMode!==room.mode)lastTelemetry=null;if(prevRole&&prevRole!==assigned()?.role)releaseAll();updateMode();}
    if(data.type==='telemetry'){lastTelemetry=data;const p=assigned();if(p)$('cue').textContent=cueText(p,data);}
   }
  });}
@@ -60,7 +61,7 @@ $('join-form').addEventListener('submit',async ev=>{
  }catch(e){message(e.message);}
 });
 if(isPreview){
- code='DEMO00';token='';room={phase:'playing',mode:params.get('mode')==='cake'?'cake':'walk',players:[{id:'preview',teamColor:'#58a7fa',teamName:'BLUE BONKERS',role:previewRole}],you:{id:'preview'},teams:[{id:0,size:5}]};
+ code='DEMO00';token='';room={phase:'playing',mode:eventById(params.get('mode'))?params.get('mode'):'walk',players:[{id:'preview',teamColor:'#58a7fa',teamName:'BLUE BONKERS',role:previewRole}],you:{id:'preview'},teams:[{id:0,size:5}]};
  updateMode();$('scenario').textContent='CONTROLLER PREVIEW · NOT CONNECTED';$('cue').textContent='LOOK AT THE TV';$('connection').textContent='● UI DEMO';$('connection').classList.add('offline');$('phone-hint').textContent='PREVIEW ONLY · NO LIVE ROOM';
 }
 if(prefill){const saved=sessionStorage.getItem(`pp-player-${prefill.toUpperCase()}`);if(saved){try{const p=JSON.parse(saved);$('join-name').value=p.name||'';}catch{}}}
