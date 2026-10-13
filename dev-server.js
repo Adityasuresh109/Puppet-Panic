@@ -22,7 +22,7 @@ export function createApp(){return http.createServer(async(req,res)=>{
     }
     const key=body.token||url.searchParams.get('token');const person=store.auth(room,key);
     if(!person) return send(res,401,{error:'Invalid or expired room session'});
-    if(route==='/api/state'&&req.method==='GET')return send(res,200,store.snapshot(room,person));
+    if(route==='/api/state'&&['GET','POST'].includes(req.method))return send(res,200,store.snapshot(room,person));
     if(route==='/api/events'&&req.method==='GET'){
       res.writeHead(200,{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache, no-transform',connection:'keep-alive','x-accel-buffering':'no'});
       if(!room.connections.has(key))room.connections.set(key,new Set());room.connections.get(key).add(res);

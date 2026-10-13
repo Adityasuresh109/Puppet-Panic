@@ -1,15 +1,27 @@
 import {Puppet,STEP,TRACK_LENGTH} from './physics.js';
 import {puppetInputs,ROLE_NAMES,allocateTeams} from './teams.js';
+import {request,snapshot,watchRoom,partyLink,configured} from './transport.js';
+import {renderQr} from './qr.js';
 const $=id=>document.getElementById(id);
-let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false;
+let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false;
+if(!configured()){
+ $('relay-setup').hidden=false;
+ setTimeout(()=>setError('Connect the public room server to create an online multiplayer party. Local demo previews remain available.'),50);
+}
+$('connect-relay').addEventListener('click',()=>{
+ try{const u=new URL($('relay-address').value.trim());if(u.protocol!=='https:'&&!(['localhost','127.0.0.1'].includes(u.hostname)&&u.protocol==='http:'))throw Error('Use an HTTPS server address');
+ if(u.username||u.password||u.pathname!=='/'&&u.pathname!==''||u.search||u.hash)throw Error('Paste only the server origin (no path or secrets)');
+ const url=new URL(location.href);url.searchParams.set('relay',u.origin);location.assign(url.toString());
+ }catch(e){setError(e.message||'Invalid server URL');}
+});
 const canvas=$('tv-canvas'),ctx=canvas.getContext('2d');
-const api=async(path,body={})=>{const res=await fetch('/api/'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,token,...body})});let payload;try{payload=await res.json();}catch{throw Error('Room server not available here. For now, launch the local LAN server with npm run dev.');}if(!res.ok)throw Error(payload.error||'Room server problem');return payload;};
+const api=(path,body={})=>request(path,{code,token,...body});
 function setError(message){$('host-error').textContent=message;}
 function renderLobby(){
  $('host-setup').hidden=room?.phase==='playing';$('host-game').hidden=room?.phase!=='playing';
  $('room-panel').hidden=!code; $('room-code').textContent=code;
- const joinUrl=new URL('./controller.html',location.href);joinUrl.searchParams.set('room',code);
- $('join-link').textContent=joinUrl.toString();$('player-count').textContent=`${room?.players?.length||0} / 25`;
+ $('join-link').textContent=partyLink(code);
+ if(code)try{renderQr($('join-qr'),partyLink(code));}catch(e){console.warn('QR unavailable',e);}$('player-count').textContent=`${room?.players?.length||0} / 25`;
  $('host-status').textContent=room?.phase==='playing'?'LIVE · GAME IN PROGRESS':'LOBBY · JOINING';
  $('host-mode').value=room?.mode||'walk';$('start-match').disabled=(room?.players?.length||0)<2;
  const panel=$('team-preview');panel.replaceChildren();
@@ -25,33 +37,33 @@ function renderLobby(){
 }
 function initGame(){
  puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:room.mode,lane:t.id}));
- elapsed=0;acc=0;finished=false;inputs.clear();
+ elapsed=0;acc=0;finished=false;inputs.clear();inputSeen.clear();
  $('round-name').textContent=room.mode==='cake'?"DON'T DROP THE CAKE!":"WALK, YOU IDIOTS!";
  $('game-summary').textContent='Every player has a station. Lift, counter-swing and lean together!';
 }
 function connect(){if(source)source.close();if(!code||!token)return;
- source=new EventSource(`/api/events?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`);
- source.addEventListener('message',ev=>{
-  const data=JSON.parse(ev.data);
-  if(data.type==='room'){
-   const wasPlaying=room?.phase==='playing';const originalIds=(room?.teams||[]).map(x=>x.id).join(',');room=data;
-   if(room.phase==='playing'&&(!wasPlaying||originalIds!==room.teams.map(x=>x.id).join(',')))initGame();
-   renderLobby();
-  }else if(data.type==='input'){inputs.set(data.playerId,data.controls||{});}
+ source=watchRoom(code,token,{
+  onMessage(data){
+   if(data.type==='room'){
+    const wasPlaying=room?.phase==='playing';const originalIds=(room?.teams||[]).map(x=>x.id).join(',');room=data;
+    if(room.phase==='playing'&&(!wasPlaying||originalIds!==room.teams.map(x=>x.id).join(',')))initGame();
+    renderLobby();
+   }else if(data.type==='input'){inputs.set(data.playerId,data.controls||{});inputSeen.set(data.playerId,performance.now());}
+  },
+  onConnection(status){$('host-status').textContent=status==='connected'?'ROOM CONNECTED':status==='connecting'?'CONNECTING TO ROOM...':'RECONNECTING TO ROOM...';}
  });
- source.addEventListener('error',()=>{$('host-status').textContent='RECONNECTING TO ROOM...';});
 }
 $('create-room').addEventListener('click',async()=>{
  try{setError('');const result=await api('create');code=result.code;token=result.token;
   sessionStorage.setItem('puppet-host',JSON.stringify({code,token}));
-  const res=await fetch(`/api/state?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`);room=await res.json();renderLobby();connect();
+  room=await snapshot(code,token);renderLobby();connect();
  }catch(e){setError(e.message);}
 });
 $('host-mode').addEventListener('change',async ev=>{try{await api('mode',{mode:ev.target.value});}catch(e){setError(e.message);}});
 $('start-match').addEventListener('click',async()=>{try{await api('start');}catch(e){setError(e.message);}});
 $('return-lobby').addEventListener('click',async()=>{if(confirm('Return everyone to lobby and reset this round?'))try{await api('reset');}catch(e){alert(e.message);}});
 let remembered;try{remembered=JSON.parse(sessionStorage.getItem('puppet-host')||'null');}catch{}
-if(remembered){code=remembered.code;token=remembered.token;fetch(`/api/state?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`).then(r=>{if(!r.ok)throw Error('Stale room');return r.json();}).then(r=>{room=r;renderLobby();connect();}).catch(()=>{sessionStorage.removeItem('puppet-host');code='';token='';});}
+if(remembered){code=remembered.code;token=remembered.token;snapshot(code,token).then(r=>{room=r;renderLobby();connect();}).catch(()=>{sessionStorage.removeItem('puppet-host');code='';token='';});}
 
 const pick=(n,d=1)=>Math.max(0,Math.min(d,n));
 function rounded(x,y,w,h,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
@@ -93,12 +105,13 @@ function drawTV(){
  }
 }
 async function sendTelemetry(){if(!room||room.phase!=='playing')return;
- try{await api('telemetry',{teams:puppets.map((p,i)=>({id:room.teams[i].id,progress:p.progress,expectedSide:p.expectedSide,unsteady:p.unsteady,phase:p.phase}))});}catch{}
+ const teams=puppets.map((p,i)=>({id:room.teams[i].id,progress:p.progress,expectedSide:p.expectedSide,unsteady:p.unsteady,phase:p.phase}));
+ if(source?.send({type:'telemetry',teams}))return;try{await api('telemetry',{teams});}catch{}
 }
 function frame(ts){if(!last)last=ts;const dt=Math.min(.07,(ts-last)/1000);last=ts;
  if(room?.phase==='playing'&&!finished){acc=Math.min(.12,acc+dt);let ticks=0;
   while(acc>=STEP&&ticks<7){for(const [i,p] of puppets.entries()){
-    const members=room.players.filter(q=>q.teamId===room.teams[i].id).map(q=>({...q,controls:inputs.get(q.id)||{}}));
+    const members=room.players.filter(q=>q.teamId===room.teams[i].id).map(q=>({...q,controls:performance.now()-(inputSeen.get(q.id)||0)<1600?inputs.get(q.id)||{}:{}}));
     p.setInput(puppetInputs(members,room.mode));p.update(STEP);
    }elapsed+=STEP;acc-=STEP;ticks++;
   }

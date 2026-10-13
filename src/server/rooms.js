@@ -14,7 +14,12 @@ export class RoomStore{
  emit(room,key,data){const sockets=room.connections.get(key);if(!sockets)return;for(const res of sockets){try{res.write(`data: ${JSON.stringify(data)}\n\n`);}catch{}}}
  notify(room){for(const [key] of room.connections){const who=this.auth(room,key);if(who)this.emit(room,key,this.snapshot(room,who));}}
  join(room,name,existingToken){if(room.phase!=='lobby'&&(!existingToken||!room.players.some(p=>p.token===existingToken)))throw Error('Match already in progress');
-  if(existingToken){const existing=room.players.find(p=>p.token===existingToken);if(existing)return existing;}
+  if(existingToken){const existing=room.players.find(p=>p.token===existingToken);if(existing){
+   this.emit(room,room.hostToken,{type:'input',playerId:existing.id,teamId:existing.teamId,controls:{},seq:existing.seq+1});
+   for(const stream of room.connections.get(existingToken)||[])try{stream.end();}catch{}
+   room.connections.delete(existingToken);
+   existing.token=token();existing.seq=0;existing.controls={};existing.online=false;this.notify(room);return existing;
+  }}
   if(room.players.length===MAX_PLAYERS)throw Error('Room full (25 players)');
   const p={id:crypto.randomUUID(),token:token(),name:sanitizeName(name),controls:{},seq:0,online:false,teamId:null,role:null};room.players.push(p);this.rebalance(room);this.notify(room);return p;}
  rebalance(room){if(room.phase!=='lobby')return;const allocation=assignPlayers(room.players);
@@ -24,7 +29,7 @@ export class RoomStore{
  start(room){if(room.phase!=='lobby')throw Error('Match already started');if(room.players.length<2)throw Error('At least 2 players required');this.rebalance(room);room.phase='playing';this.notify(room);}
  reset(room){room.phase='lobby';this.rebalance(room);this.notify(room);}
  input(room,p,seq,controls){if(room.phase!=='playing')throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;
-  const valid=ACTIONS[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.keys(controls).some(k=>!valid.includes(k)))throw Error('Invalid controls for role');
+  const valid=ACTIONS[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!valid.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');
   p.controls=Object.fromEntries(valid.map(k=>[k,Boolean(controls[k])]));p.seq=seq;
   this.emit(room,room.hostToken,{type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;
  }

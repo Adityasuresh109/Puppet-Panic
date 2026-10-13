@@ -1,109 +1,62 @@
-# PUPPET PANIC! — Puppet Lab 🦵💥
+# PUPPET PANIC! 🎭💥
 
-**Five puppets. Twenty-three controllers. Zero coordination.**
+**Five puppets. Up to twenty-five friends. Nobody owns the whole body.**
 
-Puppet Panic! is an original TV + phones cooperative-physics party game in development. Our first **playable browser prototype** is **Walk, You Idiots!**: control Bongo's limbs separately, stumble your way through hazards, and reach the finish.
+A browser party game in active development: 2–25 guests join with their own phones, automatically split into balanced teams controlling one to five puppet characters on a laptop/TV. The physics host and mobile roles are separate; cooperation is mandatory for walking or carrying the cake.
 
-![Browser game screenshot](docs/lab-screenshot.jpg)
+## Current status — public relay implementation prepared, deployment pending
 
-## Try the current prototype
+- **Solo physics lab:** `index.html` — publicly hosted for single-device movement experiments.
+- **TV/host:** `host.html` — real room roster, five-lane race rendering, per-team physics, giant join QR code.
+- **Phone:** `controller.html` — one **role-only, no-scroll** control pad per person.
+- **Local LAN:** `npm run dev` — Node 22+ creates rooms and relays controller inputs/telemetry using HTTP/SSE on your Wi-Fi.
+- **Public internet relay:** Cloudflare Durable Object + WebSocket implementation in `worker/`; **not live until Cloudflare credentials are configured and deployment is performed**.
 
-- Open **index.html** on a web server, or use the project URL after Pages deployment is configured.
-- Click **LET'S MAKE A DISASTER**.
-- Alternate holding/releasing **A** (left leg) and **D** (right leg). Planting each foot propels Bongo forward.
-- Press **J** and **K** to swing individual arms for a little extra momentum and stability.
-- Hold **Left / Right arrows** to lean the torso; tap **Space** to brace (cooldown).
-- Press **R** to restart and **H** for instructions, or use the on-screen touch controls.
-- **WATCH AI DEMO** enables a scripted automated control pattern for demonstrating the physics; it is not a paid AI API.
+The GitHub Pages site serves static HTML/JS and cannot run a room service on its own. Public previews without a connected relay are not multiplayer.
 
-At the moment, the five control channels are all available from one browser. **There is no multiplayer room or phone-to-TV synchronization yet.**
+## Play the solo physics lab
 
-## Run it locally
+On desktop visit [Puppet Panic on GitHub Pages](https://adityasuresh109.github.io/Puppet-Panic/). To make a valid left step hold **A + K + →** for roughly 0.35 seconds, then release A; for a right step hold **D + J + ←**, then release D. Repeat. Press **Cake Carry** for the challenge requiring both arms to grip the tray. The developer testing lab intentionally shows every button; **actual players use only their assigned phone control pad**.
 
-Requires Node.js 20+; there are **zero npm dependencies** in this experimental prototype.
+## Multiplayer interfaces
+
+- [Host / TV](https://adityasuresh109.github.io/Puppet-Panic/host.html)
+- [Phone controller](https://adityasuresh109.github.io/Puppet-Panic/controller.html)
+- [Five-puppet TV-only preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=23)
+- [Balance-pad preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=BALANCE)
+
+A real public room requires a deployed Cloudflare relay URL. The host has a **CONNECT SERVER** input for that one-time URL, which becomes part of the QR invite link so guests need no configuration.
+
+## Team formation
+
+Use the smallest number of puppets (`ceil(playerCount/5)`) and balance the numbers among them. Examples: 2→2; 6→3+3; 9→5+4; 15→5+5+5; 16→4+4+4+4; 19→5+5+5+4; 23→5+5+5+4+4; 25→5+5+5+5+5. At most five puppets are rendered. For 2 people, one controls both legs and the other the upper body. For 5, every limb and the torso has a distinct controller. Four-player teams combine both legs onto one controller, while three-player teams divide legs, arms, and balance.
+
+## Development and tests
+
+Requires Node.js 22 or later. The game and local server currently have no npm runtime dependencies.
 
 ```bash
-npm run dev
-# open http://localhost:4173
+npm run dev   # LAN rooms, host and phones at http://localhost:4173
+npm test      # pure physics + allocation + local HTTP + cloud Durable Object mock tests
+npm run build # static GitHub Pages assets into dist/
 ```
 
-Run tests and produce static output:
+## Cloudflare public relay
 
-```bash
-npm test
-npm run build
-# deploy dist/ as static site
-```
+The backend uses Durable Objects with SQLite state, authenticated WebSockets, reconnect token rotation, role-scoped inputs, finite room lifetime and stale-control watchdogs. For setup, see [public relay deployment](docs/public-relay.md). A manual Cloudflare account API token must be put in **GitHub Actions repository secrets** (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`); then run the **Deploy public multiplayer relay** workflow. Never paste credentials into the game itself or commit them.
 
-The game is also suitable for simple static hosting (for example GitHub Pages) because it uses native browser APIs and ES modules. For best results, use a modern Chromium, Safari, or Firefox browser.
+Until that one-time setup, the LAN game works, the static preview works, but cross-network game rooms are **not** publicly reachable.
 
-## What is already implemented
+## Remaining game milestones
 
-- [x] One animated, articulated assisted-puppet with simulated momentum and balance
-- [x] Independent left/right leg stepping, left/right arm swinging, torso lean and brace
-- [x] Recoverable falls, timed automatic get-up, fall counter and wobbly state
-- [x] Camera-following cartoon running course, three checkpoints, three cones and finish
-- [x] Comic facial expressions, sound synthesis, toast reactions and confetti
-- [x] Working keyboard and on-screen pointer/touch controls
-- [x] Auto-demo mode, restart, instructions and sound toggle
-- [x] Deterministic simulation tests plus manually checked browser interactions
+1. Actual Cloudflare deployment and public end-to-end WebSocket test with multiple phones.
+2. Live player UX: complete five-role coordination, latency/recovery telemetry and role feedback.
+3. Real 25-device load test and team-size fairness study.
+4. Five playable Puppet Olympics events (currently walking and cake carry are prototyped).
+5. Physics animation polish, accessibility, replay highlights and full party launch.
 
-## Next development gates
+See [the game spec](docs/technical-game-spec.md), [multiplayer UX](docs/multiplayer-ux.md), and [third-party licenses](docs/third-party-licenses.md).
 
-1. **Human playtest** (Issue #1 still open): confirm the body-part controls are genuinely fun with real players. Tune cadence, penalties and fall recovery.
-2. **Advanced joints / visual polish**: currently the puppet uses custom assisted torso physics and spring-damped limb particles. Evaluate replacing this with motorized Rapier 2D joints or Phaser/Matter.js integration when installation is available. Do not confuse this physics lab with a full physically constrained ragdoll.
-3. **True multiplayer**: room code, authoritative TV/host simulation, WebSocket relay, phone-specific roles, reconnect, four-player team controls, five puppets, load testing with 23 devices.
-4. **Events**: Don't Drop the Cake, The Impossible Climb, Swing for Your Life, and the Puppet Olympics finale.
-5. **Presentation**: audio polish, animation and high-quality replay export, deployment and social sharing.
+## License
 
-See [the full technical spec](docs/technical-game-spec.md) and [build progress](docs/progress.md).
-
-## License and assets
-
-Original game artwork, rendering code and synthesized sound have no third-party media dependencies in this slice. The original game code has **not** been explicitly open-source licensed by the project owner; `package.json` uses `UNLICENSED` pending that decision. Future dependencies and asset packs will be inventoried in this section and tracked by license before shipping.
-
-### Status / limitations
-
-- Local scripted browser interaction has been validated; a real multi-person playtest and cross-device mobile QA are pending.
-- No live multi-device service or final production URL has been deployed by this commit.
-- This browser-only physics proof-of-concept is a deliberate zero-dependency stepping stone toward the planned Phaser/modern physics engine.
-
-## Teamwork Lab v0.2 (coordination rework)
-
-**Update following player feedback:** the original lab could be completed by spamming any leg button. That loophole has been removed: only correctly sequenced, assisted steps advance the puppet. Arms alone never propel it. A valid planted foot needs the **next** leg, a 0.22–0.78-second lift, the **opposite arm**, and a weight transfer toward the **supporting** leg.
-
-Local keyboard walkthrough (five independent roles in the future mobile version):
-
-1. **LEFT step**: Hold **A + K + →** together for approximately 0.35 seconds. Release **A** while keeping the arm and lean briefly engaged.
-2. **RIGHT step**: Hold **D + J + ←** together for approximately 0.35 seconds. Release **D** while keeping the arm and lean briefly engaged.
-3. Alternate. Repeating one foot, neglecting an arm/torso controller, raising both feet, or mistiming the plant causes slips and faceplants, not automatic forward motion.
-4. Press **CAKE CARRY** to play a second prototype challenge: both arm controls must grip the tray while leg players and the torso player coordinate. Tilt or drop the cake and lose layers/progress.
-5. **WATCH AI DEMO** demonstrates a scripted *coordinated sequence*, not independent AI teammates or multiplayer.
-
-The screen shows the required next foot, combo, balance danger, and cake layers. `npm test` includes exploit-regression tests for missing or incorrect team inputs. This is still a local one-puppet lab; **phone roles, 23-player connection and real-device tests are not yet implemented**.
-
-Full design rationale: [Coordination-first game design](docs/coordination-first.md).
-
-
-## Party display + role controller split (early LAN prototype)
-
-The default URL remains the **solo physics lab** used for debugging; **real players must not use that scrollable control deck**. The new separation is:
-
-- TV/host: `host.html` — creates a room and renders up to five simultaneous puppets (never player control buttons).
-- Players: `controller.html` — enter room code + name, receive **one** assigned station, and see only its 1–3 large controls in a full-height, no-scroll layout.
-- Lab: `index.html` — retains the original all-input testing panel.
-
-**Team allocation: 2–25 players, maximum five puppets.** Use `ceil(n/5)` puppets and balance sizes by at most one player. 2–5 players create one co-op puppet. 6→3+3; 7→4+3; 9→5+4; 11→4+4+3; 15→5+5+5; 16→4+4+4+4; 19→5+5+5+4; 23→5+5+5+4+4; 25→5×5. See `docs/multiplayer-ux.md` for every possible split and role mapping.
-
-### Run actual networked controllers on local Wi-Fi
-
-Run `npm run dev` with Node.js 22+ on the host laptop. On that laptop visit `http://<HOST-LAN-IP>:4173/host.html` (substitute its actual local IPv4 address). All player phones must be on the same Wi-Fi and open `http://<HOST-LAN-IP>:4173/controller.html?room=<ROOM-CODE>`. Join and start from the TV host. Host computer is authoritative for physics; the local server relays role-limited control changes and assignment updates over HTTP + SSE, with tokens for each guest.
-
-**GitHub Pages hosts static files, not this Node.js room server.** It cannot yet accept real internet multiplayer joins. Public Pages links for UI review only:
-
-- [Five-puppet TV preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=23)
-- [Three-puppet TV preview](https://adityasuresh109.github.io/Puppet-Panic/host.html?preview=15)
-- [Body-balance phone controller preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=BALANCE)
-- [Two-player both-legs phone preview](https://adityasuresh109.github.io/Puppet-Panic/controller.html?preview=DUAL_LEGS)
-
-**Honest readiness:** allocation + LAN room server + role-specific UI are built and automated-tested. A 2–25-device human playtest, final physics balance between unequal team sizes, and a **public production HTTPS/WSS relay** are not yet complete. The Pages host Create Room action requires a relay and therefore does not work on Pages yet.
+The project's original code has not been explicitly open-source licensed by the project owner. Its package is marked `UNLICENSED`. The QR renderer uses a separately licensed open-source implementation; see third-party notices. No paid game runtime or third-party illustration assets are required by this prototype.

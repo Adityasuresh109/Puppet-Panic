@@ -38,7 +38,9 @@ test('HTTP room creation, join, start, reconnect and input',async()=>{
   assert.equal((await post('start',{code,token:host})).status,200);
   assert.equal((await post('input',{code,token:p1.token,seq:1,controls:{leftArm:true}})).status,400);
   assert.equal((await post('input',{code,token:p1.token,seq:1,controls:{leftLeg:true}})).status,200);
-  assert.equal((await post('join',{code,token:p1.token,name:'Alex'})).data.id,p1.id);
+  const reclaimed=(await post('join',{code,token:p1.token,name:'Alex'})).data;assert.equal(reclaimed.id,p1.id);assert.notEqual(reclaimed.token,p1.token);
+  assert.equal((await post('input',{code,token:p1.token,seq:2,controls:{leftLeg:true}})).status,401);
+  assert.equal((await post('input',{code,token:reclaimed.token,seq:1,controls:{leftLeg:true}})).status,200);
   assert.equal((await post('join',{code,name:'Late Player'})).status,400);
   state=await (await fetch(`${base}/api/state?code=${code}&token=${p2.token}`)).json();
   assert.equal(state.phase,'playing');assert.equal(state.you.role,'UPPER_BODY');
