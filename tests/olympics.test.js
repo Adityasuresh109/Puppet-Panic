@@ -62,3 +62,10 @@ test('two-player finale can use the same coordinated control pathway in each sta
  p.best=770;players[1].controls={leanRight:true,grip:true};
  assert.deepEqual(puppetInputs(players,p.activeMode),{leftLeg:true,rightLeg:false,leftArm:true,rightArm:true,lean:1,brace:false});
 });
+
+test('idle teams are tied with zero points, not artificially awarded a winner',()=>{
+ const a=new Puppet({lane:0}),b=new Puppet({lane:1});
+ const standings=eventStandings([a,b],120,120);
+ assert.deepEqual(standings.map(x=>x.rank),[1,1]);
+ assert.deepEqual(standings.map(x=>x.points),[0,0]);
+});
