@@ -1,0 +1,10 @@
+name = "puppet-panic-relay"
+main = "worker/index.js"
+compatibility_date = "2026-10-01"
+
+[durable_objects]
+bindings = [{ name = "PARTY_ROOM", class_name = "PartyRoom" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PartyRoom"]

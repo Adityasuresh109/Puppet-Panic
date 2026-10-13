@@ -1,11 +1,12 @@
 import {ACTIONS,ROLE_NAMES} from './teams.js';
+import {request,snapshot,watchRoom,configured} from './transport.js';
 const $=id=>document.getElementById(id);
 const params=new URL(location.href).searchParams;
 const prefill=params.get('room');if(prefill)$('join-code').value=prefill.toUpperCase();
 let code='',token='',room=null,source=null,seq=0,controls={},activePointers=new Map(),lastTelemetry=null;
 const previewRole=(params.get('preview')||'').toUpperCase();
 const isPreview=Boolean(ACTIONS[previewRole]);
-const api=async(path,data={})=>{const res=await fetch('/api/'+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code,token,...data})});let body;try{body=await res.json();}catch{throw Error('No multiplayer relay is running at this address yet. Host a local LAN session with npm run dev.');}if(!res.ok)throw Error(body.error||'Could not connect');return body;};
+const api=(path,data={})=>request(path,{code,token,...data});
 function message(s){$('join-error').textContent=s;}
 function assigned(){return room?.players?.find(p=>p.id===room?.you?.id);}
 function updateMode(){const p=assigned();if(!p)return;
@@ -38,25 +39,24 @@ function buildPad(actions,role,mode){const pad=$('pad-area');pad.replaceChildren
 }
 function setControl(key,value){if(controls[key]===value)return;controls[key]=value;if(isPreview)return;sendInput();}
 let inFlight=0;
-async function sendInput(){if(!room||room.phase!=='playing')return;const current=++seq;const payload={seq:current,controls:{...controls}};
- try{await api('input',payload);}catch(e){$('connection').textContent='● RECONNECTING';$('connection').classList.add('offline');}}
+async function sendInput(){if(!room||room.phase!=='playing')return;const current=++seq;const payload={type:'input',seq:current,controls:{...controls}};
+ if(source?.send(payload))return;try{await api('input',payload);}catch(e){$('connection').textContent='● RECONNECTING';$('connection').classList.add('offline');}}
 function releaseAll(){const changed=Object.values(controls).some(Boolean);controls={};activePointers.clear();document.querySelectorAll('.pad-button.pressed').forEach(b=>b.classList.remove('pressed'));if(changed)sendInput();}
 window.addEventListener('blur',releaseAll);window.addEventListener('pagehide',releaseAll);
 // Keep long-held inputs alive and let server clear stale controls on disconnect.
 setInterval(()=>{if(room?.phase==='playing'&&Object.values(controls).some(Boolean))sendInput();},650);
-function openStream(){if(source)source.close();source=new EventSource(`/api/events?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`);
- source.addEventListener('open',()=>{$('connection').textContent='● CONNECTED';$('connection').classList.remove('offline');});
- source.addEventListener('error',()=>{$('connection').textContent='● RECONNECTING';$('connection').classList.add('offline');releaseAll();});
- source.addEventListener('message',e=>{const data=JSON.parse(e.data);
-  if(data.type==='room'){const prevRole=assigned()?.role;room=data;if(prevRole&&prevRole!==assigned()?.role)releaseAll();updateMode();}
-  if(data.type==='telemetry'){lastTelemetry=data;const p=assigned();if(p)$('cue').textContent=cueText(p,data);}
- });
-}
+function openStream(){if(source)source.close();source=watchRoom(code,token,{
+  onConnection(state){$('connection').textContent=state==='connected'?'● CONNECTED':state==='connecting'?'● CONNECTING':'● RECONNECTING';$('connection').classList.toggle('offline',state!=='connected');if(state!=='connected')releaseAll();},
+  onMessage(data){
+   if(data.type==='room'){const prevRole=assigned()?.role;room=data;if(prevRole&&prevRole!==assigned()?.role)releaseAll();updateMode();}
+   if(data.type==='telemetry'){lastTelemetry=data;const p=assigned();if(p)$('cue').textContent=cueText(p,data);}
+  }
+ });}
 $('join-form').addEventListener('submit',async ev=>{
  ev.preventDefault();try{code=$('join-code').value.trim().toUpperCase();const name=$('join-name').value.trim();if(!/^[A-Z0-9]{6}$/.test(code))throw Error('Enter the six-character room code');
-  const savedKey=`pp-player-${code}`;let previous;try{previous=JSON.parse(sessionStorage.getItem(savedKey)||'null');}catch{}
-  const j=await api('join',{name,token:previous?.token});token=j.token;sessionStorage.setItem(savedKey,JSON.stringify({token,name}));
-  const res=await fetch(`/api/state?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`);room=await res.json();updateMode();openStream();
+  const savedKey=`pp-player-${code}`;let previous;try{previous=JSON.parse(localStorage.getItem(savedKey)||'null');}catch{}
+  const j=await api('join',{name,token:previous?.token});token=j.token;localStorage.setItem(savedKey,JSON.stringify({token,name}));
+  room=await snapshot(code,token);updateMode();openStream();
  }catch(e){message(e.message);}
 });
 if(isPreview){
