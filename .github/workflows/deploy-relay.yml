@@ -20,8 +20,8 @@ jobs:
       - name: Check Cloudflare connection
         id: connection
         env:
-          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFARE_ACCOUNT_ID }}
         run: |
           echo "Deploying from repository $GITHUB_REPOSITORY"
           echo "Cloudflare token present: $([ -n "$CF_API_TOKEN" ] && echo yes || echo no)"
@@ -38,8 +38,8 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         id: cloudflare
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFARE_ACCOUNT_ID }}
           command: deploy
           wranglerVersion: '4'
       - name: Show public health endpoint
