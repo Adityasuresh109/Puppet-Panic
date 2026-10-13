@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111b33" />
+  <meta name="description" content="Puppet Panic! Five puppets. Twenty-three controllers. Zero coordination. Try the physics lab." />
+  <title>Puppet Panic! — Puppet Lab</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Puppet Panic home"><span class="brand-icon">✳</span><span>PUPPET<span class="accent">PANIC!</span></span></a>
+      <div class="top-meta"><span class="live-dot"></span> PUPPET LAB <span class="beta">EARLY PLAYABLE BUILD</span></div>
+      <div class="top-actions"><button id="sound" class="icon-button" title="Toggle sound" aria-label="Toggle sound">♪ ON</button><button id="help" class="icon-button">? HOW TO PLAY</button></div>
+    </header>
+
+    <section class="intro">
+      <div class="eyebrow"><span class="lightning">⚡</span> PHYSICS LAB · EXPERIMENT #001</div>
+      <h1>WALK, <em>YOU IDIOTS!</em></h1>
+      <p>One puppet. Five controls. No brain cells required. Coordinate those wobbly limbs to reach the finish!</p>
+    </section>
+
+    <section class="arena-wrap" aria-label="Puppet race arena">
+      <div class="game-hud">
+        <div class="hud-team"><span class="circle-avatar">B</span><div><b>BONGO</b><small>THE UNCOORDINATED</small></div></div>
+        <div class="hud-time"><span>TIME</span><strong id="timer">00:00</strong></div>
+        <div class="hud-stat"><span>FACEPLANTS</span><strong id="falls">0</strong></div>
+        <div class="hud-status"><span id="status" class="status-chip">READY TO BONK</span></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="game" width="1280" height="625" role="img" aria-label="Interactive cartoon puppet running track"></canvas>
+        <div id="overlay" class="overlay">
+          <div class="overlay-card">
+            <span class="overlay-eyebrow">✳ INTRODUCING YOUR WORST ATHLETE</span>
+            <div class="puppet-preview">🤪</div>
+            <h2>MEET BONGO!</h2>
+            <p>Bongo has five working body parts and not a single clue how to use them. That's where you come in.</p>
+            <div class="overlay-guide"><span>① Lift a leg</span><span>② Release to step</span><span>③ Repeat & don't fall</span></div>
+            <button id="start" class="big-button">LET'S MAKE A DISASTER <span>→</span></button>
+            <small>Keyboard or touch controls · press H anytime for help</small>
+          </div>
+        </div>
+        <div id="toast" class="toast" aria-live="polite"></div>
+      </div>
+      <div class="track-strip"><div class="track-label"><span>🏁 THE WORLD'S LONGEST 24 METERS</span><span id="distance">0%</span></div><div class="progress-track"><div id="progress" class="progress-fill"></div><div class="checkpoint" style="left:22%"></div><div class="checkpoint" style="left:51%"></div><div class="checkpoint" style="left:77%"></div></div></div>
+    </section>
+
+    <section class="control-area">
+      <div class="section-heading"><div><span class="eyebrow">THE CONTROL DECK</span><h2>YOUR PUPPET. YOUR PROBLEM.</h2></div><div class="controller-actions"><button id="demo" class="small-action">▶ WATCH AI DEMO</button><button id="reset" class="small-action reset">↻ RESTART RUN</button></div></div>
+      <div class="controls">
+        <div class="control-card leg left-leg"><div class="control-top"><span class="control-symbol">🦵</span><span class="key">A</span></div><h3>LEFT LEG</h3><p>Hold to lift · release to plant</p><button class="pad-btn" data-action="leftLeg" type="button"><span>↑</span> STEP LEFT</button></div>
+        <div class="control-card leg right-leg"><div class="control-top"><span class="control-symbol">🦵</span><span class="key">D</span></div><h3>RIGHT LEG</h3><p>Hold to lift · release to plant</p><button class="pad-btn" data-action="rightLeg" type="button"><span>↑</span> STEP RIGHT</button></div>
+        <div class="control-card arm left-arm"><div class="control-top"><span class="control-symbol">💪</span><span class="key">J</span></div><h3>LEFT ARM</h3><p>Swing to add momentum</p><button class="pad-btn" data-action="leftArm" type="button"><span>↗</span> SWING LEFT</button></div>
+        <div class="control-card arm right-arm"><div class="control-top"><span class="control-symbol">💪</span><span class="key">K</span></div><h3>RIGHT ARM</h3><p>Swing to add momentum</p><button class="pad-btn" data-action="rightArm" type="button"><span>↗</span> SWING RIGHT</button></div>
+        <div class="control-card balance"><div class="control-top"><span class="control-symbol">⚖️</span><span class="key">← → SPACE</span></div><h3>BODY BALANCE</h3><p>Lean to stay upright · brace to save yourself</p><div class="balance-row"><button class="pad-btn lean" data-action="leanLeft" type="button">←</button><button class="pad-btn lean" data-action="leanRight" type="button">→</button></div><button class="pad-btn brace" data-action="brace" type="button">⚡ BRACE <span id="cooldown"></span></button></div>
+      </div>
+      <div class="tip-bar"><span>💡 COACH'S TERRIBLE ADVICE</span> Alternate A and D in a steady rhythm. Use J and K for a boost. Hold both legs too long and Bongo eats dirt.</div>
+    </section>
+    <footer><span>BUILT FOR LAUGHS. NOT FOR DIGNITY.</span><span>PUPPET PANIC! · PHYSICS LAB v0.1</span></footer>
+  </main>
+  <dialog id="instructions"><button id="close-help" class="close-help">✕</button><div class="eyebrow">HOW TO OPERATE A HUMAN(ISH)</div><h2>THE ART OF NOT FALLING</h2><p>Every body part is controlled separately. In the future, five friends will operate this one puppet with their phones. For now, try all controls in this single-player lab.</p><ol><li><b>Walk:</b> Hold A to lift the left foot, then release to plant it and push forward. Alternate with D.</li><li><b>Wave your arms:</b> Press J / K to swing arms, add momentum and help recover.</li><li><b>Save your balance:</b> Press ← / → to lean. SPACE braces your core for 0.65 seconds, with a cooldown.</li><li><b>Avoid hazards:</b> Time steps or brace when you reach the cones.</li><li><b>Recover:</b> Even if you fall, Bongo gets back up in about two seconds. No elimination!</li></ol><p>Tap the large colored buttons if you're using a phone or tablet. For a hands-free demonstration, use <b>WATCH AI DEMO</b>.</p></dialog>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
