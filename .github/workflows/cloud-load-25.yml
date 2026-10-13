@@ -1,0 +1,27 @@
+name: Live 25-controller scale smoke test
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/cloud-load-25.mjs"
+      - ".github/workflows/cloud-load-25.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/cloud-load-25.mjs"
+      - "worker/**"
+      - "src/teams.js"
+      - ".github/workflows/cloud-load-25.yml"
+permissions:
+  contents: read
+jobs:
+  simulate-25:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 25 phones, five teams, one host — public Cloudflare test
+        run: node scripts/cloud-load-25.mjs
