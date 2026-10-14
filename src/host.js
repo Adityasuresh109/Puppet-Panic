@@ -5,7 +5,7 @@ import {renderQr} from './qr.js';
 import {EVENTS,eventById,eventStandings,tallyTournament,secondsText} from './events.js';
 import {callFor,beep} from './announcer.js';
 const $=id=>document.getElementById(id);
-let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[],pendingEventIndex=null,creating=false,starting=false,hostConnected=false;
+let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[],pendingEventIndex=null,creating=false,starting=false,hostConnected=false,paused=false;
 const HOST_KEY='puppet-host', GAME_KEY='puppet-game-state';
 const claim=/^#reclaim=([A-F0-9]{6}):([a-f0-9]{48})$/.exec(location.hash);
 if(claim){
@@ -27,6 +27,7 @@ $('connect-relay').addEventListener('click',()=>{
 const canvas=$('tv-canvas'),ctx=canvas.getContext('2d');
 let lastComedy=0,comedyText='',muted=false;
 $('sound-toggle').addEventListener('click',()=>{muted=!muted;$('sound-toggle').textContent=muted?'🔇 SOUND OFF':'🔊 SOUND ON';});
+$('pause-match').addEventListener('click',()=>{if(room?.phase!=='playing'||finished)return;paused=!paused;$('pause-match').textContent=paused?'▶ RESUME':'⏸ PAUSE';inputs.clear();inputSeen.clear();acc=0;last=performance.now();saveHostState();sendTelemetry();});
 const api=(path,body={})=>request(path,{code,token,...body});
 function setError(message){$('host-error').textContent=message;}
 async function checkRelayHealth(){
@@ -68,9 +69,9 @@ function renderLobby(){
 function initGame(){
  const event=eventById(room.mode)||EVENTS[0];
  puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:event.id,lane:t.id}));
- elapsed=0;acc=0;finished=false;inputs.clear();inputSeen.clear();
+ elapsed=0;acc=0;finished=false;paused=false;inputs.clear();inputSeen.clear();
  const saved=checkpoint();
- if(saved){sessionFormat=saved.sessionFormat||'olympics';rounds=Array.isArray(saved.rounds)?saved.rounds:[];eventIndex=saved.eventIndex||0;pendingEventIndex=saved.pendingEventIndex??null;finalResults=saved.finalResults||[];}
+ if(saved){paused=!!saved.paused;sessionFormat=saved.sessionFormat||'olympics';rounds=Array.isArray(saved.rounds)?saved.rounds:[];eventIndex=saved.eventIndex||0;pendingEventIndex=saved.pendingEventIndex??null;finalResults=saved.finalResults||[];}
  if(saved?.mode===room.mode&&saved.puppets?.length===puppets.length){
    elapsed=saved.elapsed;
    puppets.forEach((p,i)=>{Object.assign(p,saved.puppets[i]);p.setInput({leftLeg:false,rightLeg:false,leftArm:false,rightArm:false,lean:0,brace:false});p.prev={...p.input};});
@@ -78,12 +79,13 @@ function initGame(){
  $('round-results').hidden=true;$('next-event').hidden=false;$('tv-canvas').hidden=false;
  $('round-name').textContent=`${event.icon} ${event.name}`;
  $('event-counter').textContent=sessionFormat==='olympics'?`EVENT ${eventIndex+1} OF ${EVENTS.length}`:'QUICK CHALLENGE';
- $('game-summary').textContent=event.instruction;
+ $('game-summary').textContent=event.instruction;$('pause-match').disabled=false;
+ $('pause-match').textContent=paused?'▶ RESUME':'⏸ PAUSE';
  if(saved?.mode===room.mode&&saved.resultsShown){finished=true;renderResults();}
 }
 function saveHostState(){
  if(!code||room?.phase!=='playing')return;
- try{localStorage.setItem(GAME_KEY,JSON.stringify({code,mode:room.mode,elapsed,savedAt:Date.now(),puppets,rounds,eventIndex,sessionFormat,pendingEventIndex,resultsShown:finished,finalResults}));}
+ try{localStorage.setItem(GAME_KEY,JSON.stringify({code,mode:room.mode,elapsed,savedAt:Date.now(),puppets,rounds,eventIndex,sessionFormat,pendingEventIndex,resultsShown:finished,paused,finalResults}));}
  catch(e){console.warn('Could not save match checkpoint',e);}
 }
 function renderResults(){
@@ -100,6 +102,7 @@ function renderResults(){
   item.append(a,b,c);cards.append(item);
  }
  $('round-results').hidden=false;$('tv-canvas').hidden=true;$('next-event').hidden=!hasNext;
+ $('pause-match').disabled=true;
  $('game-summary').textContent=final?'THE PUPPET OLYMPICS HAVE A CHAMPION!':hasNext?'EVENT COMPLETE · NEXT EVENT READY':'CHALLENGE COMPLETE!';
 }
 function showResults(){
@@ -235,11 +238,11 @@ function drawTV(){
  }
 }
 async function sendTelemetry(){if(!room||room.phase!=='playing')return;
- const teams=puppets.map((p,i)=>({id:room.teams[i].id,progress:p.progress,expectedSide:p.expectedSide,unsteady:p.unsteady,phase:p.phase}));
+ const teams=puppets.map((p,i)=>({id:room.teams[i].id,progress:p.progress,expectedSide:p.expectedSide,unsteady:p.unsteady,phase:paused?'paused':p.phase}));
  if(source?.send({type:'telemetry',teams}))return;try{await api('telemetry',{teams});}catch{}
 }
 function frame(ts){if(!last)last=ts;const dt=Math.min(.07,(ts-last)/1000);last=ts;
- if(room?.phase==='playing'&&!finished&&hostConnected){acc=Math.min(.12,acc+dt);let ticks=0;
+ if(room?.phase==='playing'&&!finished&&hostConnected&&!paused){acc=Math.min(.12,acc+dt);let ticks=0;
   while(acc>=STEP&&ticks<7){for(const [i,p] of puppets.entries()){
     const members=room.players.filter(q=>q.teamId===room.teams[i].id).map(q=>({...q,controls:q.online && performance.now()-(inputSeen.get(q.id)||0)<1600?inputs.get(q.id)||{}:{}}));
     p.setInput(puppetInputs(members,p.activeMode));p.update(STEP);
