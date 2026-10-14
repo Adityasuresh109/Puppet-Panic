@@ -1,6 +1,6 @@
 import {Puppet,STEP,TRACK_LENGTH,hazardsFor} from './physics.js';
 import {puppetInputs,ROLE_NAMES,allocateTeams} from './teams.js';
-import {request,snapshot,watchRoom,partyLink,configured} from './transport.js';
+import {request,snapshot,watchRoom,partyLink,configured,RELAY} from './transport.js';
 import {renderQr} from './qr.js';
 import {EVENTS,eventById,eventStandings,tallyTournament,secondsText} from './events.js';
 import {callFor,beep} from './announcer.js';
@@ -25,6 +25,20 @@ let lastComedy=0,comedyText='',muted=false;
 $('sound-toggle').addEventListener('click',()=>{muted=!muted;$('sound-toggle').textContent=muted?'🔇 SOUND OFF':'🔊 SOUND ON';});
 const api=(path,body={})=>request(path,{code,token,...body});
 function setError(message){$('host-error').textContent=message;}
+async function checkRelayHealth(){
+ const target=(RELAY||'')+'/health';
+ try{
+  const res=await fetch(target,{cache:'no-store',signal:AbortSignal.timeout(4500)});
+  if(!res.ok||!(await res.json()).ok)throw Error('Unhealthy response');
+  $('server-health').textContent='● PARTY SERVER ONLINE';$('server-health').style.color='#77e4bf';
+ }catch{
+  $('server-health').textContent='● PARTY SERVER UNAVAILABLE · Retry later, or run the local LAN host from npm run dev if Cloudflare is down.';
+  $('server-health').style.color='#ffc18b';
+  setError('The room server may be unavailable. Your party cannot start until it reconnects.');
+ }
+}
+void checkRelayHealth();
+
 function renderLobby(){
  $('host-setup').hidden=room?.phase==='playing';$('host-game').hidden=room?.phase!=='playing';$('create-room').hidden=Boolean(code);
  $('room-panel').hidden=!code; $('room-code').textContent=code;
