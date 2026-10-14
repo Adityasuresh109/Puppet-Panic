@@ -58,7 +58,7 @@ try{
 
   const host=await connect(room.code,room.token);sockets.push(host);
   const phone=await connect(room.code,first.token);sockets.push(phone);
-  await ok('start',{code:room.code,token:room.token});
+  await ok('start',{code:room.code,token:room.token,format:'olympics'});
 
   const role=state.players.find(p=>p.id===first.id)?.role;
   assert.ok(role && ACTIONS[role]?.length,'assigned role has valid controls');
@@ -76,6 +76,25 @@ try{
   host.send(JSON.stringify({type:'telemetry',teams:[{id:0,progress:0.25,expectedSide:'left',unsteady:0.1,phase:'upright'}]}));
   await telemetry;
   console.log('PASS: host progress telemetry reaches the phone controller');
+
+  const checkpoint={code:room.code,mode:'walk',elapsed:12,rounds:[],eventIndex:0,sessionFormat:'olympics',resultsShown:false,paused:true,puppets:[],savedAt:Date.now()};
+  assert.equal((await request('checkpoint',{code:room.code,token:first.token,state:checkpoint})).status,403);
+  await ok('checkpoint',{code:room.code,token:room.token,state:checkpoint});
+  const hostOnly=await ok('state',{code:room.code,token:room.token});
+  assert.deepEqual(hostOnly.checkpoint,checkpoint,'host can recover its saved game from server');
+  const guest=await ok('state',{code:room.code,token:first.token});
+  assert.equal(Object.hasOwn(guest,'checkpoint'),false,'guest cannot read host checkpoint');
+  console.log('PASS: host-only remote tournament recovery checkpoint');
+
+  await ok('reset',{code:room.code,token:room.token});
+  assert.notEqual((await request('join',{code:room.code,name:'Uninvited'})).status,200);
+  await ok('reset',{code:room.code,token:room.token,finishTournament:true});
+  await ok('join',{code:room.code,name:'Welcome After Event'});
+  console.log('PASS: roster locked during tournament; unlocks after final cancellation');
+
+  await ok('end',{code:room.code,token:room.token});
+  assert.notEqual((await request('state',{code:room.code,token:room.token})).status,200);
+  console.log('PASS: explicit party end invalidates room credentials');
 
   console.log('PASS: Puppet Panic live Cloudflare relay smoke test');
 }finally{
