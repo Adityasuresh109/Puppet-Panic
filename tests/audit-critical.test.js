@@ -81,3 +81,17 @@ test('Cloudflare host can remove unwanted lobby player and invalidate that sessi
  assert.equal(snapshot.players.length,1);
  assert.equal((await act('state',{token:rogue.token})).status,401);
 });
+
+test('Durable host checkpoint is private to host and survives a new session snapshot',async()=>{
+ const {act}=mock();const host=(await act('create',{code:'AAAA95'})).data.token;
+ const player=(await act('join',{name:'Alex'})).data;
+ await act('join',{name:'Sam'});
+ await act('start',{token:host,format:'olympics'});
+ const state={code:'AAAA95',mode:'walk',elapsed:12.5,rounds:[{event:'walk',standings:[]}],eventIndex:0,sessionFormat:'olympics',resultsShown:false,puppets:[],savedAt:Date.now()};
+ assert.equal((await act('checkpoint',{token:player.token,state})).status,403);
+ assert.equal((await act('checkpoint',{token:host,state})).status,200);
+ const hostView=(await act('state',{token:host})).data;
+ assert.deepEqual(hostView.checkpoint,state);
+ const playerView=(await act('state',{token:player.token})).data;
+ assert.equal(Object.hasOwn(playerView,'checkpoint'),false);
+});
