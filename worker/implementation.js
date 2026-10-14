@@ -7,7 +7,7 @@ const gen=(n)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toStrin
 const validateCode=c=>typeof c==='string'&&/^[A-F0-9]{6}$/.test(c.toUpperCase());
 const cleanName=s=>String(s||'').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,24)||'Mystery Player';
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'}});
-const parse=async request=>{if(Number(request.headers.get('content-length')||0)>4096)throw Error('Request too large');const data=await request.text();if(data.length>4096)throw Error('Request too large');return data?JSON.parse(data):{};};
+const parse=async (request,maxBytes=4096)=>{if(Number(request.headers.get('content-length')||0)>maxBytes)throw Error('Request too large');const data=await request.text();if(data.length>maxBytes)throw Error('Request too large');return data?JSON.parse(data):{};};
 const sameOrigin=request=>{const origin=request.headers.get('origin');return !origin||ORIGINS.has(origin);};
 function externalCors(request,response){const origin=request.headers.get('origin');const headers=new Headers(response.headers);if(origin&&ORIGINS.has(origin)){headers.set('Access-Control-Allow-Origin',origin);headers.set('Vary','Origin');headers.set('Access-Control-Allow-Methods','GET, POST, OPTIONS');headers.set('Access-Control-Allow-Headers','content-type');}return new Response(response.body,{status:response.status,headers});}
 
@@ -41,7 +41,7 @@ export default {
       }
       return externalCors(request,json({error:'Could not create unique room'},503));
     }
-    const body=request.method==='POST'?await parse(request):{};
+    const body=request.method==='POST'?await parse(request,path==='/api/checkpoint'?90000:4096):{};
     const code=(body.code||url.searchParams.get('code')||'').toUpperCase();
     if(!validateCode(code))return externalCors(request,json({error:'Invalid room code'},400));
     const forward=new Request(`https://relay.internal/${path.slice('/api/'.length)}`,{
@@ -60,7 +60,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  async save(){await this.ctx.storage.put('room',this.room);}
  alive(){return this.room&&this.room.createdAt+ROOM_TTL>Date.now();}
  auth(token){if(!this.room||typeof token!=='string')return null;if(token===this.room.hostToken)return {host:true};return this.room.players.find(p=>p.token===token)||null;}
- snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
+ snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],...(p.host?{checkpoint:r.checkpoint||null}:{}),hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
  forSockets(fn){for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.authenticated)fn(ws,a);}}
  send(ws,data){try{ws.send(JSON.stringify(data));}catch{}}
  broadcastState(){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(p)this.send(ws,this.snapshot(p));});}
@@ -95,7 +95,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      const pair=new WebSocketPair(),[client,server]=Object.values(pair);
      this.ctx.acceptWebSocket(server);server.serializeAttachment({authenticated:false,connectedAt:Date.now()});return new Response(null,{status:101,webSocket:client});
    }
-   const body=request.method==='POST'?await parse(request):{};
+   const body=request.method==='POST'?await parse(request,path==='/checkpoint'?90000:4096):{};
    if(path==='/join'&&request.method==='POST'){
      let p=body.token?this.room.players.find(p=>p.token===body.token):null;
      if(p){
@@ -129,6 +129,11 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    }
    if(path==='/reset'&&request.method==='POST'){
      this.room.roundNumber=body.finishTournament?0:(this.room.roundNumber||0)+1;this.room.phase='lobby';if(body.finishTournament)this.room.rosterLocked=false;this.rebalance();await this.save();this.broadcastState();return json({ok:true});
+   }
+   if(path==='/checkpoint'&&request.method==='POST'){
+     if(!body.state||typeof body.state!=='object'||Array.isArray(body.state)||body.state.code!==this.room.code||body.state.mode!==this.room.mode)throw Error('Invalid checkpoint');
+     if(JSON.stringify(body.state).length>82000)throw Error('Checkpoint too large');
+     this.room.checkpoint=body.state;await this.save();return json({ok:true});
    }
    if(path==='/kick'&&request.method==='POST'){
      if(this.room.phase!=='lobby'||this.room.rosterLocked)throw Error('Players can only be removed before starting a tournament');
