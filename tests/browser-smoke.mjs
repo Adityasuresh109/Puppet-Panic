@@ -9,7 +9,7 @@ let browser;const errors=[];
 try{
  browser=await chromium.launch({headless:true});
  const ctx=await browser.newContext({viewport:{width:1280,height:840}});
- const host=await ctx.newPage();
+ let host=await ctx.newPage();
  host.on('pageerror',err=>errors.push('host: '+err.message));
  await host.goto(base+'/host.html');
  await host.locator('#create-room').click();
@@ -42,6 +42,15 @@ try{
  await host.reload();
  await host.locator('#host-game').waitFor({state:'visible',timeout:12000});
  assert.match(await host.locator('#pause-match').textContent(),/RESUME/,'host refresh preserves deliberate pause');
+ const hostToken=await host.evaluate(()=>JSON.parse(localStorage.getItem('puppet-host')).token);
+ await host.waitForTimeout(1500);
+ await host.close();
+ const recoveredContext=await browser.newContext({viewport:{width:1280,height:840}});
+ host=await recoveredContext.newPage();
+ host.on('pageerror',err=>errors.push('recovered host: '+err.message));
+ await host.goto(base+'/host.html#reclaim='+code+':'+hostToken);
+ await host.locator('#host-game').waitFor({state:'visible',timeout:12000});
+ assert.match(await host.locator('#pause-match').textContent(),/RESUME/,'replacement host should restore cloud checkpoint and pause');
  await host.locator('#pause-match').click();
  assert.match(await host.locator('#event-counter').textContent(),/EVENT 1 OF 5/);
  host.once('dialog',dlg=>dlg.accept());
