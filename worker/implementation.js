@@ -77,7 +77,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      const limits=(await this.ctx.storage.get('limits'))||{};
      const prev=limits[kind]||{start:now,count:0};
      const next=now-prev.start>=windowMs?{start:now,count:0}:prev;
-     next.count++;limits[kind]=next;await this.ctx.storage.put('limits',limits);
+     next.count++;limits[kind]=next;await this.ctx.storage.put('limits',limits);await this.ctx.storage.setAlarm(now+120000);
      if(next.count>limit)return json({error:'Too many requests. Wait a minute.'},429);
      return json({ok:true});
    }
