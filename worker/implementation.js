@@ -113,6 +113,16 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    if(path==='/reset'&&request.method==='POST'){
      this.room.roundNumber=body.finishTournament?0:(this.room.roundNumber||0)+1;this.room.phase='lobby';if(body.finishTournament)this.room.rosterLocked=false;this.rebalance();await this.save();this.broadcastState();return json({ok:true});
    }
+   if(path==='/kick'&&request.method==='POST'){
+     if(this.room.phase!=='lobby'||this.room.rosterLocked)throw Error('Players can only be removed before starting a tournament');
+     const index=this.room.players.findIndex(player=>player.id===body.playerId);
+     if(index<0)throw Error('Unknown player');
+     const removed=this.room.players[index];
+     for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.token===removed.token){
+       this.send(ws,{type:'kicked'});try{ws.close(1000,'Removed by host');}catch{}
+     }
+     this.room.players.splice(index,1);this.rebalance();await this.save();this.broadcastState();return json({ok:true});
+   }
    if(path==='/end'&&request.method==='POST'){
      this.forSockets((ws)=>{this.send(ws,{type:'ended'});try{ws.close(1000,'Party ended by host');}catch{}});
      this.room=null;await this.ctx.storage.deleteAll();return json({ok:true});
