@@ -11,7 +11,7 @@ export const ROLES={
 };
 export const ROLE_NAMES={DUAL_LEGS:'BOTH LEGS',UPPER_BODY:'UPPER BODY',DUAL_ARMS:'BOTH ARMS',BALANCE:'BODY BALANCE',LEFT_LEG:'LEFT LEG',RIGHT_LEG:'RIGHT LEG',LEFT_ARM:'LEFT ARM',RIGHT_ARM:'RIGHT ARM'};
 export const ACTIONS={
-  DUAL_LEGS:['leftLeg','rightLeg'],UPPER_BODY:['leanLeft','leanRight','grip'],
+  DUAL_LEGS:['leftLeg','rightLeg'],UPPER_BODY:['leanLeft','leanRight','grip','brace'],
   DUAL_ARMS:['leftArm','rightArm'], BALANCE:['leanLeft','leanRight','brace'],
   LEFT_LEG:['leftLeg'],RIGHT_LEG:['rightLeg'],LEFT_ARM:['leftArm'],RIGHT_ARM:['rightArm']
 };

@@ -1,0 +1,35 @@
+name: Browser integration — host and phone
+on:
+  pull_request:
+    paths:
+      - "src/host.js"
+      - "src/controller.js"
+      - "worker/**"
+      - "host.html"
+      - "controller.html"
+      - "dev-server.js"
+      - "tests/browser-smoke.mjs"
+      - ".github/workflows/browser-integration.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check client JS syntax
+        run: |
+          node --check src/host.js
+          node --check src/controller.js
+          node --check worker/implementation.js
+      - name: Install open-source browser test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run real browser host and 2-phone smoke test
+        run: node tests/browser-smoke.mjs

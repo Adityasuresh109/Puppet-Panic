@@ -4,9 +4,15 @@
 
 PUPPET PANIC! is a multiplayer phone-and-TV party game for 2–25 friends in a single room. Friends join a room code or QR on their phones; the host runs animated physics on the laptop/TV. Teams divide into one to five puppets, with every phone operating assigned limbs or balance controls. Cooperation is required to move at all.
 
-## Current release: v1.0.0-rc.1 (testing, not stable v1.0)
+## Current release: v1.0.0-rc.2 (testing, not stable v1.0)
 
 The five-event Puppet Olympics game loop, scoreboard, role-specific phone controls, public Cloudflare relay, automatic team balancing, role rotation and host results screen are implemented. **The game is not yet certified v1.0**: the 25-device validation, human playtest and cross-platform reliability gates in [the release candidate document](docs/release-candidate.md) are still pending.
+
+## Host recovery and player safety
+
+Host rooms and tournament progress are saved across browser refreshes. The host can privately copy a recovery link to reclaim a party from another browser; **do not share it with guests**. Players see when the TV host disconnects, and the host can pause while a teammate reconnects. The roster is frozen after an Olympics tournament begins, so only existing players can reclaim their seats until it ends. Lobby hosts can remove unwanted participants. The public relay includes per-IP request limits; admission approval, real-device tests and advanced abuse hardening still need work.
+
+If the Cloudflare room service is unavailable, the host screen warns you before room creation. The development/LAN alternative is `npm run dev` on a laptop on the same Wi-Fi; open the laptop's local network address on phones. GitHub Pages alone cannot run a room server and does not automatically fail over to LAN.
 
 ## Launch multiplayer
 

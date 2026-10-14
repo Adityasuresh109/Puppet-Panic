@@ -29,8 +29,8 @@ test('climbing and rope-swinging need torso, legs, and supporting arms',()=>{
 });
 test('finale sections switch between sprint, cake and climb based on progress',()=>{
  const p=new Puppet({mode:'finale'});assert.equal(p.activeMode,'walk');
- p.best=765;assert.equal(p.activeMode,'cake');
- p.best=1450;assert.equal(p.activeMode,'climb');
+ p.x=765;assert.equal(p.activeMode,'cake');
+ p.x=1450;assert.equal(p.activeMode,'climb');
 });
 test('standings reward finishers, quality and cumulative winners; no button-spam score exploit',()=>{
  const p=EVENTS.slice(0,3).map((e,i)=>new Puppet({lane:i,name:`TEAM ${i}`,mode:'walk'}));
@@ -59,7 +59,7 @@ test('two-player finale can use the same coordinated control pathway in each sta
  const players=assignPlayers([{id:1},{id:2}]);
  players[0].controls={leftLeg:true};players[1].controls={leanRight:true};
  assert.deepEqual(puppetInputs(players,p.activeMode),{leftLeg:true,rightLeg:false,leftArm:false,rightArm:true,lean:1,brace:false});
- p.best=770;players[1].controls={leanRight:true,grip:true};
+ p.x=770;players[1].controls={leanRight:true,grip:true};
  assert.deepEqual(puppetInputs(players,p.activeMode),{leftLeg:true,rightLeg:false,leftArm:true,rightArm:true,lean:1,brace:false});
 });
 

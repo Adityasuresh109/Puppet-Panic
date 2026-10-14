@@ -1,4 +1,4 @@
-# Puppet Panic! — v1.0 release candidate
+# Puppet Panic! — v1.0.0-rc.2 audit-hardening candidate
 
 ## Release scope
 - Host-controlled five-event Puppet Olympics, optionally a single quick challenge.
@@ -27,3 +27,18 @@ This is **1.0.0-rc.1**, not a certified stable release.
 - Host session progress is locally checkpointed, but prolonged host disconnection requires manual review before production.
 
 No game is declared stable simply by increasing its package version or passing unit tests. The v1.0 tag follows the above gates.
+## Audit corrections in rc.2
+- Host credentials persist on the host browser, and a private recovery URL may be saved for reclaiming the party from another device. Players are told when the host loses connection.
+- Save/restore complete tournament state, results screens, event position and pause state through refreshes.
+- Host cannot repeatedly create a room; double Join is guarded. Explicit End Party invalidates the room.
+- Olympics rosters are locked at first Start and unchanged until the tournament ends; host can remove unauthorized players while lobby is unlocked.
+- Relay preflight shows online/offline status and documents LAN fallback. Production Pages links cannot silently redirect to an arbitrary attacker relay.
+- The TV uses the same per-event hazard locations as physics. A short last-moment input cannot replace sustained coordination, and no-hands climb drag is tuned. Finale stage follows current position, not farthest historical progress.
+- Placement point bonuses no longer invert rank order; two-person teams may brace.
+- Automated regression tests now cover recovery, roster locking, safe end, and control fairness. Chromium UI integration runs on pull requests.
+
+## Remaining stable v1.0 gates
+1. Test a real five-event session through the complete winners screen with real friends, including a laptop restart and several phone disconnects.
+2. Test 25 physical phones in the intended Wi-Fi environment and compare mixed-size 4-versus-5 player team fairness.
+3. Add host approval for unsolicited joins, full abuse protection, and a practical supported LAN failover or second relay before an unrestricted public launch.
+4. Validate accessibility across iOS/Android and polish gameplay/sound based on human feedback. Until then **do not tag stable v1.0**.
