@@ -27,7 +27,7 @@ export function eventStandings(puppets,elapsed,limit){
     });
     const rank=previous>=0?previous+1:i+1;
     const multiplier=p.mode==='finale'?1.5:1;
-    const points=progress===0&&!completed?0:Math.round((base[rank-1]+quality)*multiplier);
+    const points=progress===0&&!completed?0:Math.round(((base[rank-1]??0)+Math.min(quality,rank===1?20:Math.max(0,(base[rank-2]??0)-(base[rank-1]??0)-1)))*multiplier);
     return {teamId:p.lane,name:p.name,rank,points,quality,completed,progress,falls:p.falls,layers:p.layers,seconds:completed?p.finishedAt:Math.min(elapsed,limit)};
   });
 }
