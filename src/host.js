@@ -7,6 +7,10 @@ import {callFor,beep} from './announcer.js';
 const $=id=>document.getElementById(id);
 let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[],pendingEventIndex=null,creating=false,starting=false,hostConnected=false;
 const HOST_KEY='puppet-host', GAME_KEY='puppet-game-state';
+const claim=/^#reclaim=([A-F0-9]{6}):([a-f0-9]{48})$/.exec(location.hash);
+if(claim){
+ try{localStorage.setItem(HOST_KEY,JSON.stringify({code:claim[1],token:claim[2],savedAt:Date.now()}));history.replaceState(null,'',location.pathname+location.search);}catch{}
+}
 function getSaved(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
 function clearSaved(){localStorage.removeItem(HOST_KEY);localStorage.removeItem(GAME_KEY);sessionStorage.removeItem(HOST_KEY);sessionStorage.removeItem(GAME_KEY);}
 function checkpoint(){const s=getSaved(GAME_KEY);return s?.code===code&&Date.now()-s.savedAt<4*60*60*1000?s:null;}
@@ -122,6 +126,13 @@ $('create-room').addEventListener('click',async()=>{
   room=await snapshot(code,token);renderLobby();connect();
  }catch(e){setError(e.message);}
  finally{creating=false;if(!code)$('create-room').disabled=false;}
+});
+$('copy-recovery').addEventListener('click',async()=>{
+ if(!code||!token)return;
+ const url=new URL('./play.html',location.href);
+ url.hash='reclaim='+code+':'+token;
+ try{await navigator.clipboard.writeText(url.toString());setError('Private recovery link copied. Save it somewhere safe; do not share it with guests.');}
+ catch{setError('Copy unavailable. Use the same host browser to recover this party.');}
 });
 $('host-mode').addEventListener('change',async ev=>{try{await api('mode',{mode:ev.target.value});}catch(e){setError(e.message);}});
 $('host-format').addEventListener('change',()=>{sessionFormat=$('host-format').value;$('host-mode').disabled=sessionFormat==='olympics';});
