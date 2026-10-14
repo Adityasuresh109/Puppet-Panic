@@ -50,6 +50,7 @@ function openStream(){if(source)source.close();source=watchRoom(code,token,{
   onConnection(state){$('connection').textContent=state==='connected'?'● CONNECTED':state==='connecting'?'● CONNECTING':'● RECONNECTING';$('connection').classList.toggle('offline',state!=='connected');if(state!=='connected')releaseAll();},
   onMessage(data){
    if(data.type==='room'){const prevRole=assigned()?.role;const oldMode=room?.mode;room=data;if(oldMode!==room.mode)lastTelemetry=null;if(room.hostOnline===false)releaseAll();if(prevRole&&prevRole!==assigned()?.role)releaseAll();updateMode();}
+   if(data.type==='kicked'){releaseAll();source?.close();source=null;room=null;token='';$('role-screen').hidden=true;$('join-screen').hidden=false;message('The host removed this player from the lobby.');return;}
    if(data.type==='ended'){releaseAll();source?.close();source=null;room=null;token='';$('role-screen').hidden=true;$('join-screen').hidden=false;message('The host ended this party. Ask for the new room code.');return;}
    if(data.type==='telemetry'){lastTelemetry=data;const p=assigned();if(p)$('cue').textContent=cueText(p,data);}
   }
