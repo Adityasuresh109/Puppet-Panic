@@ -32,13 +32,19 @@ function button(text,emoji,action,color,wide=false,hint='HOLD • RELEASE'){
  b.addEventListener('pointerdown',e=>{if(room?.phase!=='playing'||room?.hostOnline===false)return;e.preventDefault();b.setPointerCapture(e.pointerId);activePointers.set(e.pointerId,action);setControl(action,true);b.classList.add('pressed');});
  const end=e=>{if(!activePointers.has(e.pointerId))return;e.preventDefault();activePointers.delete(e.pointerId);setControl(action,false);b.classList.remove('pressed');};
  for(const type of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(type,end);
+ b.setAttribute('aria-pressed','false');
+ b.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat&&room?.phase==='playing'&&room.hostOnline!==false){e.preventDefault();setControl(action,true);b.classList.add('pressed');}});
+ b.addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();setControl(action,false);b.classList.remove('pressed');}});
+ b.addEventListener('blur',()=>{if(controls[action]){setControl(action,false);b.classList.remove('pressed');}});
  b.addEventListener('contextmenu',e=>e.preventDefault());return b;
 }
 function buildPad(actions,role,mode){const pad=$('pad-area');pad.replaceChildren();pad.className='pad-area '+(actions.length===2?'grid-two':actions.length>=3?'grid-three':'');
  const configs={leftLeg:['LEFT STEP','🦵','amber'],rightLeg:['RIGHT STEP','🦵','orange'],leftArm:[['cake','swing','finale'].includes(mode)?'LEFT GRIP':'SWING LEFT','💪','blue'],rightArm:[['cake','swing','finale'].includes(mode)?'RIGHT GRIP':'SWING RIGHT','💪','purple'],leanLeft:['LEAN LEFT','⬅','green'],leanRight:['LEAN RIGHT','➡','green'],brace:['BRACE','⚡','red'],grip:['GRIP BOTH','🎂','purple']};
  for(const a of actions){const [label,emoji,color]=configs[a];const wide=actions.length===3&&a===actions[2];pad.append(button(label,emoji,a,color,wide,a==='brace'?'USE WHEN WOBBLY':a==='grip'?'HOLD BOTH HANDS':'HOLD • RELEASE'));}
 }
-function setControl(key,value){if(controls[key]===value)return;controls[key]=value;if(isPreview)return;sendInput();}
+function setControl(key,value){if(controls[key]===value)return;controls[key]=value;
+  document.querySelectorAll('.pad-button').forEach(b=>{if(b.dataset.action===key)b.setAttribute('aria-pressed',String(value));});
+  if(isPreview)return;sendInput();}
 let inFlight=0;
 async function sendInput(){if(!room||room.phase!=='playing'||room.hostOnline===false)return;const current=++seq;const payload={type:'input',seq:current,controls:{...controls}};
  if(source?.send(payload))return;try{await api('input',payload);}catch(e){$('connection').textContent='● RECONNECTING';$('connection').classList.add('offline');}}
