@@ -66,3 +66,18 @@ test('Ranking bonuses never let a lower rank outscore a higher rank',()=>{
  const result=eventStandings(puppets,110,120);
  for(let i=1;i<result.length;i++)assert.ok(result[i-1].points>result[i].points,'rank '+i+' preserves order');
 });
+
+test('Cloudflare per-IP room creation cap rejects excess attempts within one minute',async()=>{
+ const {act}=mock();
+ for(let i=0;i<8;i++)assert.equal((await act('rate',{kind:'create'})).status,200);
+ assert.equal((await act('rate',{kind:'create'})).status,429);
+});
+test('Cloudflare host can remove unwanted lobby player and invalidate that session',async()=>{
+ const {act}=mock();const host=(await act('create',{code:'AAAA94'})).data.token;
+ const rogue=(await act('join',{name:'Duplicate'})).data;
+ await act('join',{name:'Friend'});
+ assert.equal((await act('kick',{token:host,playerId:rogue.id})).status,200);
+ const snapshot=(await act('state',{token:host})).data;
+ assert.equal(snapshot.players.length,1);
+ assert.equal((await act('state',{token:rogue.token})).status,401);
+});
