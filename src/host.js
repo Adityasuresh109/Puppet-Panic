@@ -98,33 +98,66 @@ function connect(){if(source)source.close();if(!code||!token)return;
     renderLobby();
    }else if(data.type==='input'){inputs.set(data.playerId,data.controls||{});inputSeen.set(data.playerId,performance.now());}
   },
-  onConnection(status){$('host-status').textContent=status==='connected'?'ROOM CONNECTED':status==='connecting'?'CONNECTING TO ROOM...':'RECONNECTING TO ROOM...';}
+  onConnection(status){hostConnected=status==='connected';$('host-status').textContent=hostConnected?'ROOM CONNECTED':status==='connecting'?'CONNECTING TO ROOM...':'CONNECTION LOST · GAME PAUSED';if(!hostConnected){inputs.clear();inputSeen.clear();acc=0;}}
  });
 }
 $('create-room').addEventListener('click',async()=>{
+ if(creating||code)return;creating=true;$('create-room').disabled=true;
  try{setError('');const result=await api('create');code=result.code;token=result.token;
-  sessionStorage.setItem('puppet-host',JSON.stringify({code,token}));
+  localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));
   room=await snapshot(code,token);renderLobby();connect();
  }catch(e){setError(e.message);}
+ finally{creating=false;if(!code)$('create-room').disabled=false;}
 });
 $('host-mode').addEventListener('change',async ev=>{try{await api('mode',{mode:ev.target.value});}catch(e){setError(e.message);}});
-$('host-format').addEventListener('change',()=>{ $('host-mode').disabled=$('host-format').value==='olympics'; });
-$('start-match').addEventListener('click',async()=>{try{
-  sessionFormat=$('host-format').value; rounds=[];eventIndex=0;finalResults=[];
+$('host-format').addEventListener('change',()=>{sessionFormat=$('host-format').value;$('host-mode').disabled=sessionFormat==='olympics';});
+$('start-match').addEventListener('click',async()=>{
+ if(starting||room?.phase!=='lobby')return;starting=true;$('start-match').disabled=true;
+ try{
+  sessionFormat=$('host-format').value;rounds=[];eventIndex=0;pendingEventIndex=null;finalResults=[];localStorage.removeItem(GAME_KEY);
   if(sessionFormat==='olympics'&&room.mode!==EVENTS[0].id)await api('mode',{mode:EVENTS[0].id});
-  beep('checkpoint',muted);await api('start');
- }catch(e){setError(e.message);}});
-$('next-event').addEventListener('click',async()=>{try{
-  if(sessionFormat!=='olympics'||eventIndex>=EVENTS.length-1)return;
-  $('next-event').disabled=true;
-  await api('reset');eventIndex++;
-  await api('mode',{mode:EVENTS[eventIndex].id});
-  await api('start');$('next-event').disabled=false;
- }catch(e){$('next-event').disabled=false;setError(e.message);alert(e.message);}});
-$('finish-session').addEventListener('click',async()=>{try{sessionStorage.removeItem('puppet-game-state');await api('reset');}catch(e){alert(e.message);}});
-$('return-lobby').addEventListener('click',async()=>{if(confirm('Return everyone to lobby and reset this round?'))try{sessionStorage.removeItem('puppet-game-state');await api('reset');}catch(e){alert(e.message);}});
-let remembered;try{remembered=JSON.parse(sessionStorage.getItem('puppet-host')||'null');}catch{}
-if(remembered){code=remembered.code;token=remembered.token;snapshot(code,token).then(r=>{room=r;if(room.phase==='playing')initGame();renderLobby();connect();}).catch(()=>{sessionStorage.removeItem('puppet-host');code='';token='';});}
+  beep('checkpoint',muted);await api('start',{format:sessionFormat});
+ }catch(e){setError(e.message);}
+ finally{starting=false;renderLobby();}
+});
+$('next-event').addEventListener('click',async()=>{
+ if(sessionFormat!=='olympics'||eventIndex>=EVENTS.length-1)return;
+ $('next-event').disabled=true;pendingEventIndex??=eventIndex+1;saveHostState();
+ try{
+  const target=EVENTS[pendingEventIndex].id;
+  let state=await snapshot(code,token);
+  if(state.phase==='playing'&&state.mode!==target){await api('reset');state=await snapshot(code,token);}
+  if(state.phase==='lobby'&&state.mode!==target)await api('mode',{mode:target});
+  eventIndex=pendingEventIndex;
+  if(state.phase!=='playing')await api('start',{format:sessionFormat});
+  pendingEventIndex=null;localStorage.removeItem(GAME_KEY);
+  $('next-event').disabled=false;
+ }catch(e){$('next-event').disabled=false;setError('Event transition interrupted. Click Next Event to retry safely. '+e.message);}
+});
+async function endSession(){
+ if(!code)return;if(!confirm('End the entire party? Everyone will need a new room code.'))return;
+ try{await api('end');source?.close();source=null;hostConnected=false;clearSaved();code='';token='';room=null;puppets=[];rounds=[];eventIndex=0;finished=false;
+  $('host-setup').hidden=false;$('host-game').hidden=true;renderLobby();setError('Party ended. Create a new room when ready.');
+ }catch(e){setError('Unable to end party: '+e.message);}
+}
+$('finish-session').addEventListener('click',endSession);
+$('end-party').addEventListener('click',endSession);
+$('return-lobby').addEventListener('click',async()=>{
+ if(confirm('Cancel this tournament and return to lobby?'))try{
+  localStorage.removeItem(GAME_KEY);rounds=[];eventIndex=0;pendingEventIndex=null;finished=false;
+  await api('reset',{finishTournament:true});
+ }catch(e){alert(e.message);}
+});
+const remembered=getSaved(HOST_KEY)||(()=>{try{return JSON.parse(sessionStorage.getItem(HOST_KEY)||'null');}catch{return null;}})();
+if(remembered?.code&&remembered?.token&&(!remembered.savedAt||Date.now()-remembered.savedAt<4*60*60*1000)){
+ code=remembered.code;token=remembered.token;
+ snapshot(code,token).then(r=>{
+  room=r;localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));
+  if(room.phase==='playing')initGame();
+  else{const cp=checkpoint();if(cp){sessionFormat=cp.sessionFormat||'olympics';rounds=cp.rounds||[];eventIndex=cp.eventIndex||0;pendingEventIndex=cp.pendingEventIndex??null;}}
+  renderLobby();connect();
+ }).catch(()=>{clearSaved();code='';token='';room=null;renderLobby();});
+}
 
 const pick=(n,d=1)=>Math.max(0,Math.min(d,n));
 function rounded(x,y,w,h,r,col){ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
