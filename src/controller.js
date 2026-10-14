@@ -24,7 +24,7 @@ function updateMode(){const p=assigned();if(!p)return;
  }
  $('phone-hint').textContent=room.hostOnline===false?'THE HOST DISCONNECTED · YOUR PLACE IS SAVED':room.phase==='playing'?'THUMBS ON BUTTONS · EYES ON TV':'YOUR ROLE LOCKS WHEN THE HOST STARTS';
 }
-function cueText(p,t){if(t.phase==='finished')return 'YOU FINISHED!';if(t.phase==='fallen')return 'FACEPLANT! RECOVER!';if(t.unsteady>.68)return 'DANGER! STEADY!';if((room.mode==='cake'||room.mode==='finale'&&t.progress>.33&&t.progress<.67)&&(p.role.includes('ARM')||p.role==='UPPER_BODY'))return 'KEEP THE CAKE LEVEL!';if(room.mode==='swing')return 'GRIP ROPE + PUMP IN RHYTHM!';if(room.mode==='climb')return 'SECURE HANDHOLD + STEP!';return `${(t.expectedSide||'left').toUpperCase()} FOOT NEXT`;
+function cueText(p,t){if(t.phase==='paused')return 'HOST PAUSED · WAIT FOR TEAMMATE';if(t.phase==='finished')return 'YOU FINISHED!';if(t.phase==='fallen')return 'FACEPLANT! RECOVER!';if(t.unsteady>.68)return 'DANGER! STEADY!';if((room.mode==='cake'||room.mode==='finale'&&t.progress>.33&&t.progress<.67)&&(p.role.includes('ARM')||p.role==='UPPER_BODY'))return 'KEEP THE CAKE LEVEL!';if(room.mode==='swing')return 'GRIP ROPE + PUMP IN RHYTHM!';if(room.mode==='climb')return 'SECURE HANDHOLD + STEP!';return `${(t.expectedSide||'left').toUpperCase()} FOOT NEXT`;
 }
 function button(text,emoji,action,color,wide=false,hint='HOLD • RELEASE'){
  const b=document.createElement('button');b.type='button';b.className=`pad-button ${color}${wide?' wide':''}`;b.dataset.action=action;
