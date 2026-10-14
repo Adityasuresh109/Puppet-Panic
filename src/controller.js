@@ -22,7 +22,8 @@ function updateMode(){const p=assigned();if(!p)return;
   releaseAll();$('pad-area').dataset.role=p.role;$('pad-area').dataset.mode=room.mode;
   buildPad(wanted,p.role,room.mode);
  }
- $('phone-hint').textContent=room.hostOnline===false?'THE HOST DISCONNECTED · YOUR PLACE IS SAVED':room.phase==='playing'?'THUMBS ON BUTTONS · EYES ON TV':'YOUR ROLE LOCKS WHEN THE HOST STARTS';
+ const tips={DUAL_LEGS:'ALTERNATE LEFT / RIGHT FEET · RELEASE TO STEP',LEFT_LEG:'HOLD TO LIFT · RELEASE AS TEAM LEANS RIGHT',RIGHT_LEG:'HOLD TO LIFT · RELEASE AS TEAM LEANS LEFT',LEFT_ARM:'COUNTER-SWING WHEN RIGHT LEG LIFTS',RIGHT_ARM:'COUNTER-SWING WHEN LEFT LEG LIFTS',BALANCE:'LEAN TOWARD THE FOOT STAYING ON THE GROUND',UPPER_BODY:'YOU CONTROL BOTH UPPER ARMS + WEIGHT SHIFT',DUAL_ARMS:'SWING OPPOSITE THE ACTIVE LEG'};
+ $('phone-hint').textContent=room.hostOnline===false?'THE HOST DISCONNECTED · YOUR PLACE IS SAVED':room.phase==='playing'?'THUMBS ON BUTTONS · EYES ON TV':tips[p.role]||'WAIT FOR YOUR ROLE';
 }
 function cueText(p,t){if(t.phase==='paused')return 'HOST PAUSED · WAIT FOR TEAMMATE';if(t.phase==='finished')return 'YOU FINISHED!';if(t.phase==='fallen')return 'FACEPLANT! RECOVER!';if(t.unsteady>.68)return 'DANGER! STEADY!';if((room.mode==='cake'||room.mode==='finale'&&t.progress>.33&&t.progress<.67)&&(p.role.includes('ARM')||p.role==='UPPER_BODY'))return 'KEEP THE CAKE LEVEL!';if(room.mode==='swing')return 'GRIP ROPE + PUMP IN RHYTHM!';if(room.mode==='climb')return 'SECURE HANDHOLD + STEP!';return `${(t.expectedSide||'left').toUpperCase()} FOOT NEXT`;
 }
