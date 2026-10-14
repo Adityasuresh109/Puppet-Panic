@@ -14,7 +14,7 @@ export class RoomStore{
  snapshot(room,person){return {type:'room',code:room.code,phase:room.phase,mode:room.mode,roundNumber:room.roundNumber,players:this.roster(room),teams:room.players.length>=2?allocateTeams(room.players.length):[],rosterLocked:!!room.rosterLocked,hostOnline:(room.connections.get(room.hostToken)?.size||0)>0,you:person.host?{host:true}:{id:person.id,role:person.role,teamId:person.teamId},maxPlayers:MAX_PLAYERS};}
  emit(room,key,data){const sockets=room.connections.get(key);if(!sockets)return;for(const res of sockets){try{res.write(`data: ${JSON.stringify(data)}\n\n`);}catch{}}}
  notify(room){for(const [key] of room.connections){const who=this.auth(room,key);if(who)this.emit(room,key,this.snapshot(room,who));}}
- join(room,name,existingToken){if((room.phase!=='lobby'||room.rosterLocked)&&(!existingToken||!room.players.some(p=>p.token===existingToken)))throw Error('Tournament roster locked or match already in progress');
+ join(room,name,existingToken){if((room.phase!=='lobby'||room.rosterLocked)&&(!existingToken||!room.players.some(p=>p.token===existingToken)))throw Error('Match already in progress or tournament roster locked');
   if(existingToken){const existing=room.players.find(p=>p.token===existingToken);if(existing){
    this.emit(room,room.hostToken,{type:'input',playerId:existing.id,teamId:existing.teamId,controls:{},seq:existing.seq+1});
    for(const stream of room.connections.get(existingToken)||[])try{stream.end();}catch{}
