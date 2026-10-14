@@ -19,7 +19,8 @@ try{
  assert.equal(await host.locator('#create-room').isVisible(),false,'existing room must hide Create');
  const phones=[];
  for(const [i,name] of ['Alex','Sam'].entries()){
-  const p=await ctx.newPage();p.on('pageerror',err=>errors.push('phone'+i+': '+err.message));
+  const phoneContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  const p=await phoneContext.newPage();p.on('pageerror',err=>errors.push('phone'+i+': '+err.message));
   await p.goto(base+'/controller.html?room='+code);
   await p.locator('#join-name').fill(name);
   await p.locator('#join-form button[type="submit"]').click();
@@ -39,11 +40,11 @@ try{
  await host.reload();
  await host.locator('#host-game').waitFor({state:'visible',timeout:12000});
  assert.match(await host.locator('#event-counter').textContent(),/EVENT 1 OF 5/);
+ host.once('dialog',dlg=>dlg.accept());
  await host.locator('#return-lobby').click();
- host.once('dialog',dlg=>dlg.accept());
  await host.locator('#host-setup').waitFor({state:'visible',timeout:12000});
- await host.locator('#end-party').click();
  host.once('dialog',dlg=>dlg.accept());
+ await host.locator('#end-party').click();
  await phones[0].locator('#join-screen').waitFor({state:'visible',timeout:12000});
  assert.equal(errors.length,0,errors.join('\n'));
  console.log('PASS: live browser host+two controllers join, start, host reload, end party');
