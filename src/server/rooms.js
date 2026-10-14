@@ -36,6 +36,11 @@ export class RoomStore{
   p.controls=Object.fromEntries(valid.map(k=>[k,Boolean(controls[k])]));p.seq=seq;
   this.emit(room,room.hostToken,{type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;
  }
- end(room){for(const [key] of room.connections)this.emit(room,key,{type:'ended'});this.rooms.delete(room.code);for(const sockets of room.connections.values())for(const res of sockets)try{res.end();}catch{}}
+ kick(room,playerId){if(room.phase!=='lobby'||room.rosterLocked)throw Error('Players can only be removed before starting a tournament');
+  const index=room.players.findIndex(p=>p.id===playerId);if(index<0)throw Error('Unknown player');
+  const p=room.players[index];this.emit(room,p.token,{type:'kicked'});
+  for(const res of room.connections.get(p.token)||[])try{res.end();}catch{}
+  room.connections.delete(p.token);room.players.splice(index,1);this.rebalance(room);this.notify(room);}
+  end(room){for(const [key] of room.connections)this.emit(room,key,{type:'ended'});this.rooms.delete(room.code);for(const sockets of room.connections.values())for(const res of sockets)try{res.end();}catch{}}
  disconnect(room,p){if(!p||p.host)return;p.controls={};p.online=false;this.emit(room,room.hostToken,{type:'input',playerId:p.id,teamId:p.teamId,controls:{},seq:p.seq+1});this.notify(room);}
 }
