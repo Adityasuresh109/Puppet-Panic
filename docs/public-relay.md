@@ -1,7 +1,7 @@
 # Puppet Panic! public rooms — deployment and operations
 
 ## Status
-The static game is hosted on GitHub Pages. The cloud relay implementation is included in `worker/index.js`, backed by a Cloudflare Durable Object with SQLite storage. **An actual public relay is not deployed until a Cloudflare account is connected.** Do not call the static preview real multiplayer.
+The static game is hosted on GitHub Pages. The cloud relay implementation is included in `worker/index.js`, backed by a Cloudflare Durable Object with SQLite storage. **The Cloudflare relay is deployed** at `https://puppet-panic-relay.adityasuresh2110.workers.dev`, and automated WebSocket smoke tests have succeeded. Full 25-physical-device testing is still pending.
 
 ## What works now
 - Roles and room membership are authenticated with random room tokens.
@@ -35,4 +35,6 @@ Run `npm run dev` and visit `http://<host-LAN-IP>:4173/host.html` on the host, t
 - Real Cloudflare deployment / browser-to-Worker connection is unverified without credentials.
 - No 25-physical-device test, WebSocket packet-loss simulation against a deployed Worker, or fair-play calibration on mixed connections yet.
 - The first release uses one game clock on the host; the host reconnecting mid-round restarts the simulation and will need checkpoint recovery before production.
-- The host invite currently shows a shareable link and room code. A fully offline-generated QR code remains to be implemented.
+- The host invite currently shows a shareable link and room code. The join QR code is generated locally with the included QR library.
+## October 2026 audit hardening
+The public backend now uses per-IP Durable Object windows to limit creation/join requests, exposes host online/offline status, supports explicit room end and host removal of lobby guests, and locks the Olympics roster between events. Host credentials are never exposed to players. **These controls do not replace Turnstile, host approval of incoming guests, or production-scale penetration tests.**
