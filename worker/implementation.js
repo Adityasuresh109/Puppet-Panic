@@ -18,6 +18,12 @@ export default {
   if(!sameOrigin(request))return json({error:'This website is not authorized to use the game relay'},403);
   if(path==='/health')return externalCors(request,json({ok:true,version:1,service:'puppet-panic-relay'}));
   if(!path.startsWith('/api/'))return externalCors(request,json({error:'Unknown endpoint'},404));
+  if(request.method==='POST'&&(path==='/api/create'||path==='/api/join')){
+    const ip=request.headers.get('cf-connecting-ip')||'unknown';
+    const gate=env.PARTY_ROOM.getByName('LIMIT:'+ip);
+    const result=await gate.fetch(new Request('https://relay.internal/rate',{method:'POST',body:JSON.stringify({kind:path==='/api/create'?'create':'join'})}));
+    if(!result.ok)return externalCors(request,result);
+  }
   // Handshake requires a real WebSocket, and must not be wrapped into a new Response.
   if(path==='/api/events'){
     const code=url.searchParams.get('code')?.toUpperCase();
@@ -64,6 +70,17 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  validatedInput(p,seq,controls){if(this.room.phase!=='playing')throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;const keys=ACTIONS[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!keys.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');p.seq=seq;p.controls=Object.fromEntries(keys.map(k=>[k,controls[k]===true]));this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;}
  async fetch(request){const url=new URL(request.url),path=url.pathname;
   try{
+   if(path==='/rate'&&request.method==='POST'){
+     const {kind}=await parse(request);
+     if(!['create','join'].includes(kind))return json({error:'Invalid request'},400);
+     const now=Date.now(),limit=kind==='create'?8:100,windowMs=60000;
+     const limits=(await this.ctx.storage.get('limits'))||{};
+     const prev=limits[kind]||{start:now,count:0};
+     const next=now-prev.start>=windowMs?{start:now,count:0}:prev;
+     next.count++;limits[kind]=next;await this.ctx.storage.put('limits',limits);
+     if(next.count>limit)return json({error:'Too many requests. Wait a minute.'},429);
+     return json({ok:true});
+   }
    await this.load();
    if(path==='/create'&&request.method==='POST'){
      if(this.alive())return json({error:'Room code collision'},409);
