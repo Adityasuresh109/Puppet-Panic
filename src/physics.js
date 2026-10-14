@@ -44,7 +44,7 @@ export class Puppet {
   }
   get activeMode() {
     if(this.mode!=='finale') return this.mode;
-    const p=(this.best-115)/(TRACK_LENGTH-115);
+    const p=(this.x-115)/(TRACK_LENGTH-115);
     return p<1/3?'walk':p<2/3?'cake':'climb';
   }
   setMode(mode) {
@@ -189,7 +189,7 @@ export class Puppet {
     this.x = Math.max(80, this.x + this.vx * dt);
     if (Math.abs(this.tilt) > (braced ? .83 : .68) || this.unsteady > 1.05) this.fall('balance');
     if (challenge === 'cake' && this.phase === 'running') this.updateCake(dt);
-    if(challenge==='climb' && this.phase==='running' && this.steps>0 && !i.leftArm&&!i.rightArm){this.unsteady+=dt*.75;this.vx*=Math.pow(.96,dt*60);}
+    if(challenge==='climb' && this.phase==='running' && this.steps>0 && !i.leftArm&&!i.rightArm){this.unsteady+=dt*.75;this.vx*=Math.pow(.99,dt*60);}
     if(challenge==='swing' && this.phase==='running'){
       // A rope crossing requires BOTH hands to remain on the rope while legs pump.
       const ropeReady=i.leftArm&&i.rightArm;
