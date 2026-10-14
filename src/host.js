@@ -71,7 +71,7 @@ function initGame(){
  puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:event.id,lane:t.id}));
  elapsed=0;acc=0;finished=false;paused=false;inputs.clear();inputSeen.clear();
  const saved=checkpoint();
- if(saved){paused=!!saved.paused;sessionFormat=saved.sessionFormat||'olympics';rounds=Array.isArray(saved.rounds)?saved.rounds:[];eventIndex=saved.eventIndex||0;pendingEventIndex=saved.pendingEventIndex??null;finalResults=saved.finalResults||[];}
+ if(saved){paused=!!saved.paused;sessionFormat=saved.sessionFormat||'olympics';rounds=Array.isArray(saved.rounds)?saved.rounds:[];eventIndex=saved.mode===room.mode?(saved.eventIndex||0):(saved.pendingEventIndex??Math.max(0,EVENTS.findIndex(e=>e.id===room.mode)));pendingEventIndex=saved.pendingEventIndex??null;finalResults=saved.finalResults||[];}
  if(saved?.mode===room.mode&&saved.puppets?.length===puppets.length){
    elapsed=saved.elapsed;
    puppets.forEach((p,i)=>{Object.assign(p,saved.puppets[i]);p.setInput({leftLeg:false,rightLeg:false,leftArm:false,rightArm:false,lean:0,brace:false});p.prev={...p.input};});
