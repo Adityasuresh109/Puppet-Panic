@@ -58,7 +58,10 @@ function renderLobby(){
   const title=document.createElement('strong');title.textContent=team.name;
   const quantity=document.createElement('div');quantity.className='big';quantity.textContent=`${team.size} PLAYER${team.size===1?'':'S'}`;
   const list=document.createElement('div');list.className='team-players';
-  for(const p of room.players.filter(x=>x.teamId===team.id)){const chip=document.createElement('span');chip.title=ROLE_NAMES[p.role];chip.textContent=p.name;list.append(chip);}
+  for(const p of room.players.filter(x=>x.teamId===team.id)){const chip=document.createElement('span');chip.title=ROLE_NAMES[p.role];chip.textContent=p.name;
+   if(!room.rosterLocked){const kick=document.createElement('button');kick.type='button';kick.className='player-kick';kick.textContent='×';kick.title='Remove '+p.name;kick.setAttribute('aria-label','Remove '+p.name);
+     kick.addEventListener('click',async()=>{if(!confirm('Remove '+p.name+' from the lobby?'))return;try{await api('kick',{playerId:p.id});}catch(e){setError(e.message);}});chip.append(kick);}
+   list.append(chip);}
   box.append(title,quantity,list);panel.append(box);
  }
 }
