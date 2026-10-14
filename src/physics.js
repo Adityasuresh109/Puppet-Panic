@@ -12,6 +12,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const point = (x, y) => ({ x, y, vx: 0, vy: 0 });
 const sideKey = s => `${s}Leg`;
 const oppose = s => s === 'left' ? 'right' : 'left';
+export const hazardsFor = mode => mode==='climb'?[620,1140,1600]:mode==='swing'?[710,1310,1710]:[680,1230,1660];
 
 export class Puppet {
   constructor({ color = '#ffb638', name = 'BONGO', lane = 0, mode = 'walk' } = {}) {
@@ -163,8 +164,8 @@ export class Puppet {
           : (i[`${other}Arm`] && !i[`${side}Arm`]);
         const weightOK = i.lean * weightSign > .6;
         const t = this.holdTime[side];
-        this.supportQuality[side] += (Number(armsOK) - this.supportQuality[side]) * Math.min(1, dt * 24);
-        this.weightQuality[side] += (Number(weightOK) - this.weightQuality[side]) * Math.min(1, dt * 24);
+        this.supportQuality[side] += (Number(armsOK) - this.supportQuality[side]) * Math.min(1, dt * 5);
+        this.weightQuality[side] += (Number(weightOK) - this.weightQuality[side]) * Math.min(1, dt * 5);
         if (t > .82) this.unsteady += dt * (braced ? .65 : 1.8);
         if (!weightOK) this.unsteady += dt * (braced ? .35 : .75);
         if (!armsOK) this.unsteady += dt * (braced ? .3 : .65);
@@ -188,7 +189,7 @@ export class Puppet {
     this.x = Math.max(80, this.x + this.vx * dt);
     if (Math.abs(this.tilt) > (braced ? .83 : .68) || this.unsteady > 1.05) this.fall('balance');
     if (challenge === 'cake' && this.phase === 'running') this.updateCake(dt);
-    if(challenge==='climb' && this.phase==='running' && this.steps>0 && !i.leftArm&&!i.rightArm){this.unsteady+=dt*.75;this.vx*=.96;}
+    if(challenge==='climb' && this.phase==='running' && this.steps>0 && !i.leftArm&&!i.rightArm){this.unsteady+=dt*.75;this.vx*=Math.pow(.96,dt*60);}
     if(challenge==='swing' && this.phase==='running'){
       // A rope crossing requires BOTH hands to remain on the rope while legs pump.
       const ropeReady=i.leftArm&&i.rightArm;
@@ -198,7 +199,7 @@ export class Puppet {
     }
     if (this.phase === 'running') {
       // Ground hazards require a properly prepared step; slamming the cone is not harmless.
-      for (const ox of (challenge==='climb'?[620,1140,1600]:challenge==='swing'?[710,1310,1710]:[680,1230,1660])) {
+      for (const ox of hazardsFor(challenge)) {
         if (this.x > ox - 10 && this.x < ox + 10 && this.vx > 20 && !raisedSide && !braced && this.time - this.lastEventAt > .4) {
           this.unsteady += .36; this.vx *= .3;
           this.emit('bonk', { obstacle: ox });
