@@ -37,8 +37,12 @@ try{
   const scroll=await phone.evaluate(()=>document.documentElement.scrollHeight-window.innerHeight);
   assert.ok(scroll<=2,'controller must not require scroll');
  }
+ await host.locator('#pause-match').click();
+ assert.match(await host.locator('#pause-match').textContent(),/RESUME/);
  await host.reload();
  await host.locator('#host-game').waitFor({state:'visible',timeout:12000});
+ assert.match(await host.locator('#pause-match').textContent(),/RESUME/,'host refresh preserves deliberate pause');
+ await host.locator('#pause-match').click();
  assert.match(await host.locator('#event-counter').textContent(),/EVENT 1 OF 5/);
  host.once('dialog',dlg=>dlg.accept());
  await host.locator('#return-lobby').click();
