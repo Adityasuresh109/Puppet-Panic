@@ -5,7 +5,7 @@ import {renderQr} from './qr.js';
 import {EVENTS,eventById,eventStandings,tallyTournament,secondsText} from './events.js';
 import {callFor,beep} from './announcer.js';
 const $=id=>document.getElementById(id);
-let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[],pendingEventIndex=null,creating=false,starting=false,hostConnected=false,paused=false;
+let code='',token='',source=null,room=null,puppets=[],inputs=new Map(),inputSeen=new Map(),last=0,acc=0,lastTelemetry=0,elapsed=0,finished=false,sessionFormat='olympics',rounds=[],eventIndex=0,finalResults=[],pendingEventIndex=null,creating=false,starting=false,hostConnected=false,paused=false,lastCloudCheckpoint=0;
 const HOST_KEY='puppet-host', GAME_KEY='puppet-game-state';
 const claim=/^#reclaim=([A-F0-9]{6}):([a-f0-9]{48})$/.exec(location.hash);
 if(claim){
@@ -70,7 +70,7 @@ function initGame(){
  const event=eventById(room.mode)||EVENTS[0];
  puppets=(room.teams||[]).map(t=>new Puppet({color:t.color,name:t.name,mode:event.id,lane:t.id}));
  elapsed=0;acc=0;finished=false;paused=false;inputs.clear();inputSeen.clear();
- const saved=checkpoint();
+ const saved=checkpoint()||room?.checkpoint||null;
  if(saved){paused=!!saved.paused;sessionFormat=saved.sessionFormat||'olympics';rounds=Array.isArray(saved.rounds)?saved.rounds:[];eventIndex=saved.mode===room.mode?(saved.eventIndex||0):(saved.pendingEventIndex??Math.max(0,EVENTS.findIndex(e=>e.id===room.mode)));pendingEventIndex=saved.pendingEventIndex??null;finalResults=saved.finalResults||[];}
  if(saved?.mode===room.mode&&saved.puppets?.length===puppets.length){
    elapsed=saved.elapsed;
@@ -85,8 +85,9 @@ function initGame(){
 }
 function saveHostState(){
  if(!code||room?.phase!=='playing')return;
- try{localStorage.setItem(GAME_KEY,JSON.stringify({code,mode:room.mode,elapsed,savedAt:Date.now(),puppets,rounds,eventIndex,sessionFormat,pendingEventIndex,resultsShown:finished,paused,finalResults}));}
- catch(e){console.warn('Could not save match checkpoint',e);}
+ const state={code,mode:room.mode,elapsed,savedAt:Date.now(),puppets,rounds,eventIndex,sessionFormat,pendingEventIndex,resultsShown:finished,paused,finalResults};
+ try{localStorage.setItem(GAME_KEY,JSON.stringify(state));}catch(e){console.warn('Could not save local checkpoint',e);}
+ if(Date.now()-lastCloudCheckpoint>4000||finished){lastCloudCheckpoint=Date.now();void api('checkpoint',{state}).catch(e=>console.warn('Cloud checkpoint delayed',e.message));}
 }
 function renderResults(){
  const event=eventById(room.mode)||EVENTS[0];
@@ -185,7 +186,7 @@ if(remembered?.code&&remembered?.token&&(!remembered.savedAt||Date.now()-remembe
  snapshot(code,token).then(r=>{
   room=r;localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));
   if(room.phase==='playing')initGame();
-  else{const cp=checkpoint();if(cp){sessionFormat=cp.sessionFormat||'olympics';rounds=cp.rounds||[];eventIndex=cp.eventIndex||0;pendingEventIndex=cp.pendingEventIndex??null;}}
+  else{const cp=checkpoint()||room.checkpoint;if(cp){sessionFormat=cp.sessionFormat||'olympics';rounds=cp.rounds||[];eventIndex=cp.eventIndex||0;pendingEventIndex=cp.pendingEventIndex??null;}}
   renderLobby();connect();
  }).catch(()=>{clearSaved();code='';token='';room=null;renderLobby();});
 }
