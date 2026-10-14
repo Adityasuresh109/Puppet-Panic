@@ -41,6 +41,7 @@ export function createApp(){return http.createServer(async(req,res)=>{
     if(route==='/api/mode'&&req.method==='POST'){store.mode(room,body.mode);return send(res,200,{ok:true});}
     if(route==='/api/start'&&req.method==='POST'){store.start(room,body.format);return send(res,200,{ok:true});}
     if(route==='/api/reset'&&req.method==='POST'){store.reset(room,body.finishTournament);return send(res,200,{ok:true});}
+    if(route==='/api/kick'&&req.method==='POST'){store.kick(room,body.playerId);return send(res,200,{ok:true});}
     if(route==='/api/end'&&req.method==='POST'){store.end(room);return send(res,200,{ok:true});}
     if(route==='/api/telemetry'&&req.method==='POST'){
       // The host owns simulation/score. Publish only bounded, non-sensitive status to phones.
