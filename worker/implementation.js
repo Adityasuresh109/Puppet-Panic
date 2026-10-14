@@ -54,7 +54,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  async save(){await this.ctx.storage.put('room',this.room);}
  alive(){return this.room&&this.room.createdAt+ROOM_TTL>Date.now();}
  auth(token){if(!this.room||typeof token!=='string')return null;if(token===this.room.hostToken)return {host:true};return this.room.players.find(p=>p.token===token)||null;}
- snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
+ snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
  forSockets(fn){for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.authenticated)fn(ws,a);}}
  send(ws,data){try{ws.send(JSON.stringify(data));}catch{}}
  broadcastState(){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(p)this.send(ws,this.snapshot(p));});}
@@ -68,7 +68,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    if(path==='/create'&&request.method==='POST'){
      if(this.alive())return json({error:'Room code collision'},409);
      const {code}=await parse(request);if(!validateCode(code))return json({error:'Invalid room'},400);
-     this.room={code,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',roundNumber:0,players:[]};
+     this.room={code,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',roundNumber:0,rosterLocked:false,players:[]};
      await this.save();await this.ctx.storage.setAlarm(Date.now()+ROOM_TTL);
      return json({code,token:this.room.hostToken});
    }
@@ -87,7 +87,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
        for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.token===p.token)try{ws.close(1000,'Rejoined from another tab');}catch{}
        p.token=gen(24);p.seq=0;p.controls={};p.online=false;
      }else{
-       if(this.room.phase!=='lobby')throw Error('Match already in progress');
+       if(this.room.phase!=='lobby'||this.room.rosterLocked)throw Error('Tournament roster is locked. Rejoin on your existing phone or wait for a new party.');
        if(this.room.players.length>=25)throw Error('Room full (25 players)');
        p={id:crypto.randomUUID(),token:gen(24),name:cleanName(body.name),teamId:null,role:null,online:false,controls:{},seq:0};
        this.room.players.push(p);this.rebalance();
@@ -108,10 +108,14 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    }
    if(path==='/start'&&request.method==='POST'){
      if(this.room.phase!=='lobby'||this.room.players.length<2)throw Error('At least two players required in lobby');
-     this.rebalance();this.room.phase='playing';await this.save();this.broadcastState();return json({ok:true});
+     this.rebalance();if(body.format==='olympics')this.room.rosterLocked=true;this.room.phase='playing';await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/reset'&&request.method==='POST'){
-     this.room.roundNumber=(this.room.roundNumber||0)+1;this.room.phase='lobby';this.rebalance();await this.save();this.broadcastState();return json({ok:true});
+     this.room.roundNumber=body.finishTournament?0:(this.room.roundNumber||0)+1;this.room.phase='lobby';if(body.finishTournament)this.room.rosterLocked=false;this.rebalance();await this.save();this.broadcastState();return json({ok:true});
+   }
+   if(path==='/end'&&request.method==='POST'){
+     this.forSockets((ws)=>{this.send(ws,{type:'ended'});try{ws.close(1000,'Party ended by host');}catch{}});
+     this.room=null;await this.ctx.storage.deleteAll();return json({ok:true});
    }
    if(path==='/telemetry'&&request.method==='POST'){
      if(this.room.phase==='playing'&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),phase:String(x.phase||'').slice(0,20)})));
@@ -129,7 +133,10 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      if(msg.type!=='auth'||Date.now()-attachment.connectedAt>10000){ws.close(1008,'Authentication required');return;}
      const p=this.auth(msg.token);if(!p||msg.code!==this.room.code){ws.close(1008,'Invalid session');return;}
      attachment.authenticated=true;attachment.token=msg.token;attachment.host=!!p.host;attachment.playerId=p.id||null;
-     ws.serializeAttachment(attachment);if(!p.host){p.online=true;await this.save();}
+     ws.serializeAttachment(attachment);
+     if(p.host){
+       for(const other of this.ctx.getWebSockets())if(other!==ws && other.readyState===1 && other.deserializeAttachment()?.host)try{other.close(1000,'Host reconnected in another tab');}catch{}
+     }else{p.online=true;await this.save();}
      this.send(ws,{type:'ready'});this.send(ws,this.snapshot(p));this.broadcastState();return;
    }
    const p=this.auth(attachment.token);if(!p){ws.close(1008,'Expired credentials');return;}
@@ -142,7 +149,9 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  }
  async webSocketClose(ws){await this.endSocket(ws);}
  async webSocketError(ws){await this.endSocket(ws);}
- async endSocket(ws){const a=ws.deserializeAttachment();if(!a?.authenticated||a.host)return;await this.load();const p=this.auth(a.token);if(!p)return;
+ async endSocket(ws){const a=ws.deserializeAttachment();if(!a?.authenticated)return;
+  if(a.host){await this.load();const otherHost=this.ctx.getWebSockets().some(other=>other!==ws&&other.readyState===1&&other.deserializeAttachment()?.authenticated&&other.deserializeAttachment()?.host);if(!otherHost&&this.room)this.broadcastState();return;}
+  await this.load();const p=this.auth(a.token);if(!p)return;
   const stillActive=this.ctx.getWebSockets().some(other=>other!==ws&&other.deserializeAttachment()?.token===a.token&&other.readyState===1);
   if(stillActive)return;
   p.online=false;p.controls={};p.seq++;this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:{},seq:p.seq});await this.save();this.broadcastState();
