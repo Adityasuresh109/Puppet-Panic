@@ -8,14 +8,14 @@ const root=path.dirname(fileURLToPath(import.meta.url));
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json'};
 const store=new RoomStore();
 const send=(res,status,data)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(data));};
-const readBody=async req=>{let s='';for await(const chunk of req){s+=chunk;if(s.length>8192)throw Error('Request too large');}return s?JSON.parse(s):{};};
+const readBody=async (req,max=8192)=>{let s='';for await(const chunk of req){s+=chunk;if(s.length>max)throw Error('Request too large');}return s?JSON.parse(s):{};};
 export function createApp(){return http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');const route=url.pathname;
   if(route==='/health')return send(res,200,{ok:true,version:1,service:'puppet-panic-lan'});
   if(route.startsWith('/api/')){
    try{
     if(route==='/api/create'&&req.method==='POST'){const room=store.create();return send(res,200,{code:room.code,token:room.hostToken});}
-    const body=req.method==='POST'?await readBody(req):{};
+    const body=req.method==='POST'?await readBody(req,route==='/api/checkpoint'?90000:8192):{};
     const room=store.find(body.code||url.searchParams.get('code'));
     if(!room) return send(res,404,{error:'Room not found. Ask the host for the new code.'});
     if(route==='/api/join'&&req.method==='POST'){
@@ -41,6 +41,10 @@ export function createApp(){return http.createServer(async(req,res)=>{
     if(route==='/api/mode'&&req.method==='POST'){store.mode(room,body.mode);return send(res,200,{ok:true});}
     if(route==='/api/start'&&req.method==='POST'){store.start(room,body.format);return send(res,200,{ok:true});}
     if(route==='/api/reset'&&req.method==='POST'){store.reset(room,body.finishTournament);return send(res,200,{ok:true});}
+    if(route==='/api/checkpoint'&&req.method==='POST'){
+      if(!body.state||body.state.code!==room.code||body.state.mode!==room.mode)throw Error('Invalid checkpoint');
+      room.checkpoint=body.state;return send(res,200,{ok:true});
+    }
     if(route==='/api/kick'&&req.method==='POST'){store.kick(room,body.playerId);return send(res,200,{ok:true});}
     if(route==='/api/end'&&req.method==='POST'){store.end(room);return send(res,200,{ok:true});}
     if(route==='/api/telemetry'&&req.method==='POST'){
