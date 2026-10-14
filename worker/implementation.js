@@ -91,7 +91,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    }
    if(!this.alive())return json({error:'Room expired. Please create another.'},404);
    if((path==='/events'||path==='/api/events')&&request.headers.get('Upgrade')?.toLowerCase()==='websocket'){
-     if(this.ctx.getWebSockets().length>40)return json({error:'Room connection capacity exceeded'},429);
+     if(this.ctx.getWebSockets().filter(ws=>ws.readyState===1).length>75)return json({error:'Room connection capacity exceeded'},429);
      const pair=new WebSocketPair(),[client,server]=Object.values(pair);
      this.ctx.acceptWebSocket(server);server.serializeAttachment({authenticated:false,connectedAt:Date.now()});return new Response(null,{status:101,webSocket:client});
    }
@@ -116,6 +116,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    if(path==='/state'&&['GET','POST'].includes(request.method))return json(this.snapshot(p));
    if(path==='/input'&&request.method==='POST'){
      if(p.host)return json({error:'Players only'},403);
+     const now=Date.now(),key='http:'+p.token;let rate=this.rate.get(key)||{start:now,n:0};if(now-rate.start>1000)rate={start:now,n:0};if(++rate.n>12)throw Error('Input rate limit exceeded');this.rate.set(key,rate);
      const accepted=this.validatedInput(p,body.seq,body.controls);return json({ok:true,accepted});
    }
    if(!p.host)return json({error:'Host access required'},403);
@@ -168,7 +169,9 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      ws.serializeAttachment(attachment);
      if(p.host){
        for(const other of this.ctx.getWebSockets())if(other!==ws && other.readyState===1 && other.deserializeAttachment()?.host)try{other.close(1000,'Host reconnected in another tab');}catch{}
-     }else{p.online=true;await this.save();}
+     }else{
+       for(const other of this.ctx.getWebSockets())if(other!==ws&&other.readyState===1&&other.deserializeAttachment()?.token===msg.token)try{other.close(1000,'Same phone joined in another tab');}catch{}
+       p.online=true;await this.save();}
      this.send(ws,{type:'ready'});this.send(ws,this.snapshot(p));this.broadcastState();return;
    }
    const p=this.auth(attachment.token);if(!p){ws.close(1008,'Expired credentials');return;}
