@@ -49,3 +49,11 @@ test('cake mode: coordinated arms, legs, torso can make progress',()=>{const p=n
 test('brace cannot substitute for team coordination',()=>{const p=new Puppet();p.setInput({brace:true,leftLeg:true});ticks(p,20);p.setInput({leftLeg:false});ticks(p,20);assert.equal(p.steps,0);assert.ok(p.cooldown>0);});
 test('checkpoint and finish are deterministic once legitimately reached',()=>{const p=new Puppet();coordinate(p,60);assert.ok(p.checkpoint>115,`checkpoint not reached x=${p.x}`);p.x=TRACK_LENGTH-2;p.vx=150;ticks(p,3);assert.equal(p.phase,'finished');assert.equal(p.progress,1);});
 test('ranking and points',()=>{const a=new Puppet(),b=new Puppet();a.best=500;b.best=700;assert.equal(ranking([a,b])[0],b);assert.deepEqual([0,1,2,3,4].map(placePoints),[100,80,65,50,40]);});
+test('last-moment 80 ms arm and torso correction does not pass sustained coordination gate',()=>{
+ const p=new Puppet();
+ p.setInput({leftLeg:true,leftArm:false,rightArm:false,lean:0});ticks(p,17);
+ p.setInput({rightArm:true,lean:1});ticks(p,5);
+ p.setInput({leftLeg:false});ticks(p,1);
+ assert.equal(p.steps,0,'a short final input correction cannot fake sustained team coordination');
+ assert.ok(p.events.some(e=>e.type==='slip'));
+});
