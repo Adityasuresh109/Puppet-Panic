@@ -57,7 +57,7 @@ try{
  await host.waitForFunction(()=>JSON.parse(localStorage.getItem('puppet-host'))?.selectedMode==='swing');
  assert.equal(await host.locator('#host-format').inputValue(),'quick');
  await host.reload();
- await host.waitForFunction(()=>document.querySelector('#room-code')?.textContent?.trim()==='${code}',null,{timeout:10000});
+ await host.waitForFunction(expected=>document.querySelector('#room-code')?.textContent?.trim()===expected,code,{timeout:10000});
  await host.waitForFunction(()=>document.querySelector('#host-status')?.textContent==='ROOM CONNECTED',null,{timeout:10000});
  assert.equal(await host.locator('#host-format').inputValue(),'quick');
  assert.equal(await host.locator('#host-mode').inputValue(),'swing');
