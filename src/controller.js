@@ -47,12 +47,12 @@ function setControl(key,value){if(controls[key]===value)return;controls[key]=val
   document.querySelectorAll('.pad-button').forEach(b=>{if(b.dataset.action===key)b.setAttribute('aria-pressed',String(value));});
   if(isPreview)return;sendInput();}
 let inFlight=0;
-async function sendInput(){if(!room||room.phase!=='playing'||room.hostOnline===false)return;const current=++seq;const payload={type:'input',seq:current,controls:{...controls}};
+async function sendInput(){if(isPreview||!room||room.phase!=='playing'||room.hostOnline===false)return;const current=++seq;const payload={type:'input',seq:current,controls:{...controls}};
  if(source?.send(payload))return;try{await api('input',payload);}catch(e){$('connection').textContent='● RECONNECTING';$('connection').classList.add('offline');}}
 function releaseAll(){const changed=Object.values(controls).some(Boolean);controls={};activePointers.clear();document.querySelectorAll('.pad-button.pressed').forEach(b=>b.classList.remove('pressed'));if(changed)sendInput();}
 window.addEventListener('blur',releaseAll);window.addEventListener('pagehide',releaseAll);
 // Keep long-held inputs alive and let server clear stale controls on disconnect.
-setInterval(()=>{if(room?.phase==='playing'&&Object.values(controls).some(Boolean))sendInput();},650);
+setInterval(()=>{if(!isPreview&&room?.phase==='playing'&&Object.values(controls).some(Boolean))sendInput();},650);
 function openStream(){if(source)source.close();source=watchRoom(code,token,{
   onConnection(state){$('connection').textContent=state==='connected'?'● CONNECTED':state==='connecting'?'● CONNECTING':'● RECONNECTING';$('connection').classList.toggle('offline',state!=='connected');if(state!=='connected')releaseAll();},
   onMessage(data){
@@ -62,12 +62,23 @@ function openStream(){if(source)source.close();source=watchRoom(code,token,{
    if(data.type==='telemetry'){lastTelemetry=data;const p=assigned();if(p)$('cue').textContent=cueText(p,data);}
   }
  });}
-$('join-form').addEventListener('submit',async ev=>{
+// Input events run synchronously, so the join button is clickable on the
+// same interaction that completes the room code and player name.
+const joinForm=$('join-form'),joinButton=joinForm.querySelector('[type="submit"]');
+function updateJoinAvailability(){
+ const codeReady=/^[A-Z0-9]{6}$/.test($('join-code').value.trim().toUpperCase());
+ const nameReady=Boolean($('join-name').value.trim());
+ joinButton.disabled=joining||!codeReady||!nameReady;
+}
+joinForm.addEventListener('input',updateJoinAvailability);
+joinForm.addEventListener('change',updateJoinAvailability);
+updateJoinAvailability();
+joinForm.addEventListener('submit',async ev=>{
  ev.preventDefault();if(joining)return;joining=true;const submit=$('join-form').querySelector('[type="submit"]');if(submit)submit.disabled=true;try{code=$('join-code').value.trim().toUpperCase();const name=$('join-name').value.trim();if(!/^[A-Z0-9]{6}$/.test(code))throw Error('Enter the six-character room code');
   const savedKey=`pp-player-${code}`;let previous;try{previous=JSON.parse(localStorage.getItem(savedKey)||'null');}catch{}
   const j=await api('join',{name,token:previous&&Date.now()-previous.savedAt<4*60*60*1000?previous.token:undefined});token=j.token;localStorage.setItem(savedKey,JSON.stringify({token,name,savedAt:Date.now()}));
   room=await snapshot(code,token);updateMode();openStream();
- }catch(e){message(e.message);}finally{joining=false;if(submit)submit.disabled=false;}
+ }catch(e){message(e.message);}finally{joining=false;updateJoinAvailability();}
 });
 if(isPreview){
  code='DEMO00';token='';room={phase:'playing',mode:eventById(params.get('mode'))?params.get('mode'):'walk',players:[{id:'preview',teamColor:'#58a7fa',teamName:'BLUE BONKERS',role:previewRole}],you:{id:'preview'},teams:[{id:0,size:5}]};
