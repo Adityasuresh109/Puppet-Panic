@@ -12,6 +12,18 @@ if(claim){
  try{localStorage.setItem(HOST_KEY,JSON.stringify({code:claim[1],token:claim[2],savedAt:Date.now()}));history.replaceState(null,'',location.pathname+location.search);}catch{}
 }
 function getSaved(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
+function saveLobbyChoices(){
+ if(!code||!token)return;
+ const current=getSaved(HOST_KEY)||{};
+ localStorage.setItem(HOST_KEY,JSON.stringify({...current,code,token,savedAt:current.savedAt||Date.now(),sessionFormat,selectedMode:$('host-mode').value}));
+}
+function restoreLobbyChoices(saved){
+ if(!saved)return;
+ sessionFormat=saved.sessionFormat==='quick'?'quick':'olympics';
+ if(saved.selectedMode&&EVENTS.some(e=>e.id===saved.selectedMode))$('host-mode').value=saved.selectedMode;
+ $('host-format').value=sessionFormat;
+ $('host-mode').disabled=sessionFormat==='olympics';
+}
 function clearSaved(){localStorage.removeItem(HOST_KEY);localStorage.removeItem(GAME_KEY);sessionStorage.removeItem(HOST_KEY);sessionStorage.removeItem(GAME_KEY);}
 function checkpoint(){const s=getSaved(GAME_KEY);return s?.code===code&&Date.now()-s.savedAt<4*60*60*1000?s:null;}
 if(!configured()){
@@ -49,7 +61,7 @@ function renderLobby(){
  $('room-panel').hidden=!code; $('room-code').textContent=code;
  $('join-link').textContent=partyLink(code);
  if(code)try{renderQr($('join-qr'),partyLink(code));}catch(e){console.warn('QR unavailable',e);}$('player-count').textContent=`${room?.players?.length||0} / 25`;
- $('host-status').textContent=room?.phase==='playing'?'LIVE · GAME IN PROGRESS':'LOBBY · JOINING';
+ $('room-phase').textContent=!code?'NO ROOM':room?.phase==='playing'?'LIVE · GAME IN PROGRESS':'LOBBY · JOINING';
  $('host-mode').value=room?.mode||'walk';$('start-match').disabled=starting||(room?.players?.length||0)<2;
  $('host-format').value=sessionFormat;$('host-mode').disabled=sessionFormat==='olympics';
  const panel=$('team-preview');panel.replaceChildren();
@@ -129,7 +141,7 @@ function connect(){if(source)source.close();if(!code||!token)return;
 $('create-room').addEventListener('click',async()=>{
  if(creating||code)return;creating=true;$('create-room').disabled=true;
  try{setError('');const result=await api('create');code=result.code;token=result.token;
-  localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));
+  localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now(),sessionFormat,selectedMode:$('host-mode').value}));
   room=await snapshot(code,token);renderLobby();connect();
  }catch(e){setError(e.message);}
  finally{creating=false;if(!code)$('create-room').disabled=false;}
@@ -141,8 +153,12 @@ $('copy-recovery').addEventListener('click',async()=>{
  try{await navigator.clipboard.writeText(url.toString());setError('Private recovery link copied. Save it somewhere safe; do not share it with guests.');}
  catch{setError('Copy unavailable. Use the same host browser to recover this party.');}
 });
-$('host-mode').addEventListener('change',async ev=>{try{await api('mode',{mode:ev.target.value});}catch(e){setError(e.message);}});
-$('host-format').addEventListener('change',()=>{sessionFormat=$('host-format').value;$('host-mode').disabled=sessionFormat==='olympics';});
+$('host-mode').addEventListener('change',async ev=>{
+ const selectedMode=ev.target.value;
+ saveLobbyChoices();
+ try{await api('mode',{mode:selectedMode});}catch(e){setError(e.message);if(room)ev.target.value=room.mode;saveLobbyChoices();}
+});
+$('host-format').addEventListener('change',()=>{sessionFormat=$('host-format').value;$('host-mode').disabled=sessionFormat==='olympics';saveLobbyChoices();});
 $('start-match').addEventListener('click',async()=>{
  if(starting||room?.phase!=='lobby')return;starting=true;$('start-match').disabled=true;
  try{
@@ -167,7 +183,7 @@ $('next-event').addEventListener('click',async()=>{
  }catch(e){$('next-event').disabled=false;setError('Event transition interrupted. Click Next Event to retry safely. '+e.message);}
 });
 async function endSession(){
- if(!code)return;if(!confirm('End the entire party? Everyone will need a new room code.'))return;
+ if(!code)return;if(!confirm('END PARTY? This permanently closes the room for everyone. To play again, create a new room code.'))return;
  try{await api('end');source?.close();source=null;hostConnected=false;clearSaved();code='';token='';room=null;puppets=[];rounds=[];eventIndex=0;finished=false;
   $('host-setup').hidden=false;$('host-game').hidden=true;renderLobby();setError('Party ended. Create a new room when ready.');
  }catch(e){setError('Unable to end party: '+e.message);}
@@ -184,7 +200,7 @@ const remembered=getSaved(HOST_KEY)||(()=>{try{return JSON.parse(sessionStorage.
 if(remembered?.code&&remembered?.token&&(!remembered.savedAt||Date.now()-remembered.savedAt<4*60*60*1000)){
  code=remembered.code;token=remembered.token;
  snapshot(code,token).then(r=>{
-  room=r;localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));
+  room=r;restoreLobbyChoices(remembered);saveLobbyChoices();
   if(room.phase==='playing')initGame();
   else{const cp=checkpoint()||room.checkpoint;if(cp){sessionFormat=cp.sessionFormat||'olympics';rounds=cp.rounds||[];eventIndex=cp.eventIndex||0;pendingEventIndex=cp.pendingEventIndex??null;}}
   renderLobby();connect();
