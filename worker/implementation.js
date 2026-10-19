@@ -127,7 +127,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      this.rebalance();this.room.rosterLocked=true;this.room.warmedUp=true;this.room.phase='warmup';await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/mode'&&request.method==='POST'){
-     if(this.room.phase!=='lobby'||!(this.room.variant==='grandprix'?GP_EVENT_IDS:EVENT_IDS).includes(body.mode))throw Error('Select the challenge in the lobby');
+     if(this.room.phase!=='lobby'||!(this.room.variant==='grandprix'?GP_EVENT_IDS.includes(body.mode):EVENT_IDS.includes(body.mode)))throw Error('Select the challenge in the lobby');
      this.room.mode=body.mode;await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/start'&&request.method==='POST'){
