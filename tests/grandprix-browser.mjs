@@ -49,6 +49,17 @@ try{
  assert.equal(await phone.evaluate(()=>document.documentElement.scrollHeight<=window.innerHeight+2),true);
  const canvas=host.locator('#track');assert.equal(await canvas.isVisible(),true);
  const png=await canvas.screenshot();assert.ok(png.byteLength>3500,'rendered scene should not be blank');
+ // The real production experience must survive accidental host and phone
+ // refreshes without changing the party code or reassigning the phone.
+ await phone.reload();
+ await phone.locator('#pad').waitFor({state:'visible',timeout:12000});
+ assert.equal((await phone.locator('#role').textContent()).trim(),'LEFT LEG');
+ assert.equal(await phone.locator('#buttons button').count(),1);
+ await host.reload();
+ await host.locator('#race').waitFor({state:'visible',timeout:12000});
+ assert.equal((await host.locator('#host-phase').textContent()).trim(),'WARM UP');
+ assert.equal((await host.locator('#room-code').textContent()).trim(),code);
+ console.log('PASS: host refresh and phone auto-reclaim preserve room and assigned limb');
  console.log('PASS: 24 players -> 6 puppets, real warm-up, limb highlight and no phone scrolling');
  await host.locator('#start-race').click();
  await host.waitForFunction(()=>document.querySelector('#host-phase')?.textContent==='RACING',null,{timeout:12000});
