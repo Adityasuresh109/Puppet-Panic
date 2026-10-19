@@ -25,7 +25,7 @@ test('LAN grand prix supports solo warm-up and role-limited inputs',()=>{
 });
 test('LAN v1 preserves existing threshold and roles',()=>{
  const rs=new RoomStore(),r=rs.create();rs.join(r,'One');
- assert.throws(()=>rs.start(r),/Not enough players/);
+ assert.throws(()=>rs.start(r),/At least 2 players required/);
  assert.throws(()=>rs.warmup(r),/Cannot start/);
  assert.equal(r.variant,'olympics');
 });
