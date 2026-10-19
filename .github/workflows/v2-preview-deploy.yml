@@ -12,6 +12,7 @@ on:
       - 'scripts/build-grandprix.js'
       - 'tests/grandprix-polish-browser.mjs'
       - 'tests/grandprix-branding-browser.mjs'
+      - 'tests/grandprix-qr-empty-browser.mjs'
       - '.github/workflows/v2-preview-deploy.yml'
 permissions:
   contents: read
@@ -51,3 +52,4 @@ jobs:
         run: |
           node tests/grandprix-polish-browser.mjs
           node tests/grandprix-branding-browser.mjs
+          node tests/grandprix-qr-empty-browser.mjs
