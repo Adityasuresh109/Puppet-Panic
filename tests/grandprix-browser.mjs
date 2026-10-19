@@ -50,7 +50,7 @@ try{
  const canvas=host.locator('#track');assert.equal(await canvas.isVisible(),true);
  const png=await canvas.screenshot();assert.ok(png.byteLength>3500,'rendered scene should not be blank');
  console.log('PASS: 24 players -> 6 puppets, real warm-up, limb highlight and no phone scrolling');
- await host.locator('#start').click();
+ await host.locator('#start-race').click();
  await host.waitForFunction(()=>document.querySelector('#host-phase')?.textContent==='RACING',null,{timeout:12000});
  await host.locator('#results').waitFor({state:'visible',timeout:15000});
  assert.equal(await host.locator('.gp-podium-card').count(),6);
