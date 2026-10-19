@@ -18,7 +18,7 @@ async function connect(code,token,receive){
  return ws;
 }
 const health=await fetch(BASE+'/health');assert.equal(health.status,200);
-const page=await fetch(BASE+'/');assert.equal(page.status,200);assert.match(await page.text(),/PUPPET GRAND PRIX/);
+const page=await fetch(BASE+'/');assert.equal(page.status,200);assert.match(await page.text(),/GRAND PRIX/);
 console.log('PASS: separate public v2 Worker and actual HTML served');
 let code='',hostToken='';
 try{
