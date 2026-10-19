@@ -21,7 +21,7 @@ function prepareRace(){
  }
  $('results').hidden=!ended;$('next').hidden=!ended||raceIndex>=4;$('pause').textContent=paused?'▶ RESUME':'⏸ PAUSE';
  $('event-title').textContent=raceMode().icon+' '+raceMode().name;
- $('instructions').textContent=room?.phase==='warmup'?'Press your phone controls and watch the matching puppet limbs light up. Tell the host when your team is ready!':raceMode().instruction;
+ $('instructions').textContent=room?.phase==='warmup'?'Press your phone controls and watch the matching puppet limbs light up. Tell the host when your team is ready! Step with the pulsing BEAT to move faster. Off-beat steps still work.':raceMode().instruction+(['walk','finale'].includes(room?.mode)?' Step with the pulsing BEAT to move faster. Off-beat steps still work.':'');
  if(ended)showResults(false);
 }
 function saveState(force=false){if(!code||!['warmup','playing'].includes(room?.phase))return;
@@ -59,6 +59,21 @@ function showResults(addRound=true){if(addRound&&!ended){ended=true;const result
  const board=$('podium');board.replaceChildren();for(const s of ranked){const card=document.createElement('div');card.className='gp-podium-card';card.style.setProperty('--team',room.teams.find(t=>t.id===s.teamId)?.color||'#fff');card.textContent=`#${s.rank} ${s.name} · ${s.points} PTS · ${s.finishedAt===null?Math.round(s.progress*100)+'%':s.finishedAt.toFixed(1)+'s'}`;board.append(card);}
  $('race-indicator').textContent='FINISHED';
 }
+function drawFinishLabel(laneTop,laneHeight,finishX){
+ // Measure the entire word and fit it to the usable space before the finish post.
+ // Draw last, above arriving puppets, so their heads cannot hide its final letters.
+ const word='FINISH',right=finishX-12,left=finishX-168,padding=7;
+ const available=right-left-padding*2;
+ let size=Math.min(18,Math.max(12,laneHeight*.135));
+ ctx.font=`900 ${size}px system-ui`;
+ let width=ctx.measureText(word).width;
+ if(width>available){size*=available/width;ctx.font=`900 ${size}px system-ui`;width=ctx.measureText(word).width;}
+ const x=right-width-padding,baseline=laneTop+Math.min(laneHeight-5,Math.max(size+9,laneHeight*.29));
+ ctx.fillStyle='#e8f3e6eb';
+ ctx.fillRect(x-padding,baseline-size-4,width+padding*2,size+9);
+ ctx.fillStyle='#283e63';
+ ctx.fillText(word,x,baseline);
+}
 function draw(){const W=canvas.width,H=canvas.height,n=Math.max(1,racers.length),laneHeight=H/n;ctx.clearRect(0,0,W,H);
  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#72bbdf');bg.addColorStop(1,'#c7e9df');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
  for(const [i,p] of racers.entries()){
@@ -66,7 +81,7 @@ function draw(){const W=canvas.width,H=canvas.height,n=Math.max(1,racers.length)
   ctx.fillStyle='#456174';ctx.fillRect(0,y+5,W,laneHeight*.29);ctx.fillStyle='#9bdfb9';ctx.fillRect(0,y,W,6);
   const px=230+1000*p.progress;
   ctx.strokeStyle='#fff7';ctx.setLineDash([8,9]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(228,y+20);ctx.lineTo(1255,y+20);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#fff7';ctx.fillRect(1230,y-90,7,90);ctx.fillStyle='#283e63';ctx.font=`900 ${Math.max(13,laneHeight*.13)}px system-ui`;ctx.fillText('FINISH',1180,y-97);
+  ctx.fillStyle='#fff7';ctx.fillRect(1230,y-90,7,90);
   ctx.fillStyle='#192d4bdb';ctx.fillRect(7,i*laneHeight+6,205,Math.min(75,laneHeight*.51));ctx.fillStyle=p.color;ctx.font=`900 ${Math.min(19,laneHeight*.16)}px system-ui`;ctx.fillText(p.name,16,i*laneHeight+Math.min(26,laneHeight*.22));ctx.fillStyle='white';ctx.font=`850 ${Math.min(14,laneHeight*.12)}px system-ui`;ctx.fillText(Math.round(p.progress*100)+'% · '+p.falls+' FALLS',16,i*laneHeight+Math.min(50,laneHeight*.40));
   ctx.save();ctx.translate(px,y);const z=Math.min(.83,Math.max(.38,laneHeight/245));ctx.scale(z,z);ctx.rotate(p.phase==='fallen'?1.06:Math.sin(p.wobble*3)*.06);
   const limb=(a,b,c,d,held,color)=>{ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.lineWidth=held?18:14;ctx.lineCap='round';ctx.strokeStyle=held?'#ff666f':color;ctx.stroke();};
@@ -81,6 +96,7 @@ function draw(){const W=canvas.width,H=canvas.height,n=Math.max(1,racers.length)
   ctx.restore();
   ctx.fillStyle='#142d4c';ctx.fillRect(10,y+15,200,9);ctx.fillStyle=p.color;ctx.fillRect(10,y+15,200*p.progress,9);
   if(p.finishedAt!==null){ctx.fillStyle='#203850';ctx.font='900 17px system-ui';ctx.fillText('🏁 FINISHED!',1040,i*laneHeight+30);}
+  drawFinishLabel(i*laneHeight,laneHeight,1230);
  }
  // A shared one-second pulse makes the rhythm visible without penalizing misses.
  const beat=(clock%1),pulse=1-Math.min(beat,1-beat)*1.8;ctx.fillStyle=`rgba(255,223,122,${Math.max(.2,pulse)})`;ctx.beginPath();ctx.arc(W-40,40,13+17*pulse,0,Math.PI*2);ctx.fill();ctx.fillStyle='#142944';ctx.font='900 16px system-ui';ctx.fillText('BEAT',W-65,80);
