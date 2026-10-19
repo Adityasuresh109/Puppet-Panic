@@ -13,7 +13,7 @@ const stagesForRace=['walk','cake','swing','climb','finale'];
 function raceMode(){return GP_EVENTS.find(e=>e.id===room?.mode)||GP_EVENTS[0];}
 function prepareRace(){
  const snap=read(STATE_KEY)||room?.checkpoint;
- const usable=snap&&snap.code===code&&snap.mode===room?.mode&&Date.now()-snap.savedAt<14400000;
+ const usable=snap&&snap.code===code&&snap.mode===room?.mode&&snap.phase===room?.phase&&Date.now()-snap.savedAt<14400000;
  racers=room.teams.map(t=>new GrandPrixPuppet({lane:t.id,color:t.color,name:t.name,mode:room.mode}));
  clock=0;acc=0;ended=false;paused=false;input.clear();inputTime.clear();
  if(usable){clock=snap.clock||0;raceIndex=snap.raceIndex||0;rounds=snap.rounds||[];paused=!!snap.paused;ended=!!snap.ended;
@@ -25,7 +25,7 @@ function prepareRace(){
  if(ended)showResults(false);
 }
 function saveState(force=false){if(!code||!['warmup','playing'].includes(room?.phase))return;
- const state={code,mode:room.mode,clock,raceIndex,rounds,paused,ended,savedAt:Date.now(),racers:racers.map(p=>({x:p.x,elapsed:p.elapsed,finishedAt:p.finishedAt,falls:p.falls,stumbles:p.stumbles,steps:p.steps,wobble:p.wobble,phase:p.phase,recovery:p.recovery,layers:p.layers,hold:p.hold,moving:p.moving,expected:p.expected,lastStep:p.lastStep,lastAction:p.lastAction,_badBoth:p._badBoth,_armDrop:p._armDrop,_invalidReach:p._invalidReach,lastStage:p.lastStage}))};
+ const state={code,mode:room.mode,phase:room.phase,clock,raceIndex,rounds,paused,ended,savedAt:Date.now(),racers:racers.map(p=>({x:p.x,elapsed:p.elapsed,finishedAt:p.finishedAt,falls:p.falls,stumbles:p.stumbles,steps:p.steps,wobble:p.wobble,phase:p.phase,recovery:p.recovery,layers:p.layers,hold:p.hold,moving:p.moving,expected:p.expected,lastStep:p.lastStep,lastAction:p.lastAction,_badBoth:p._badBoth,_armDrop:p._armDrop,_invalidReach:p._invalidReach,lastStage:p.lastStage}))};
  localStorage.setItem(STATE_KEY,JSON.stringify(state));
  if(force||Date.now()-lastSave>4000){lastSave=Date.now();void api('checkpoint',{state}).catch(e=>console.warn('Recovery backup delayed',e.message));}
 }
