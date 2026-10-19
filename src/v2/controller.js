@@ -6,7 +6,14 @@ const preview=Boolean(GP_ACTIONS[previewRole]);
 let code='',token='',room=null,stream=null,controls={},seq=0,joining=false,stage='',lastMode='',jobTimeout=null,activePointers=new Map(),offline=true;
 const api=(path,data={})=>request(path,{code,token,...data});
 function btnEnable(){const name=$('name').value.trim(),roomCode=$('code').value.trim().toUpperCase();$('join-button').disabled=joining||!name||!/^[A-F0-9]{6}$/.test(roomCode);}
-$('join-form').addEventListener('input',btnEnable);
+const joinForm=$('join-form');
+joinForm.addEventListener('input',btnEnable);
+joinForm.addEventListener('change',btnEnable);
+// Paste fires before the browser updates the field value. Check after the
+// default paste action, while the normal input event covers immediate updates.
+joinForm.addEventListener('paste',()=>setTimeout(btnEnable,0));
+window.addEventListener('load',btnEnable);
+window.addEventListener('pageshow',btnEnable);
 function send(){if(preview||!room||!['warmup','playing'].includes(room.phase)||room.hostOnline===false)return;
  const packet={type:'input',seq:++seq,controls:{...controls}};
  if(stream?.send(packet))return;
@@ -33,7 +40,7 @@ function banner(text){clearTimeout(jobTimeout);$('new-job').textContent='NEW JOB
 function updateJob(nextStage,notify=false){const player=selectedPlayer();if(!player)return;
  stage=nextStage;const sentences=(GP_ACTIONS[player.role]||[]).map(limb=>gpJob(limb,stage));const job=sentences.join(' · ');
  $('job').textContent=job||'LOOK AT THE TV';if(notify)banner(job);
- const footnotes={climb:'THREE HOLD · ONE REACHES',walk:'STEP LEFT / RIGHT · KEEP THE BEAT',cake:'ARMS UP · WALK SMOOTHLY',swing:'GRIP BOTH ARMS · PUMP LEGS'};
+ const footnotes={climb:'THREE HOLD · ONE REACHES',walk:'FOLLOW THE BEAT PULSE FOR FASTER STEPS · OFF-BEAT STILL WORKS',cake:'ARMS UP · WALK SMOOTHLY',swing:'GRIP BOTH ARMS · PUMP LEGS'};
  $('cue').textContent=room.phase==='warmup'?'PRACTICE YOUR BUTTONS · TELL HOST WHEN READY':footnotes[stage]||'LOOK AT THE TV';
 }
 function render(){const p=selectedPlayer();if(!p)return;
