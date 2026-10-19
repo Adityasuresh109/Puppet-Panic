@@ -11,6 +11,7 @@ on:
       - 'grand-prix-controller.html'
       - 'scripts/build-grandprix.js'
       - 'tests/grandprix-polish-browser.mjs'
+      - 'tests/grandprix-branding-browser.mjs'
       - '.github/workflows/v2-preview-deploy.yml'
 permissions:
   contents: read
@@ -47,4 +48,6 @@ jobs:
       - name: Verify all three changes against deployed preview
         env:
           GRAND_PRIX_BASE_URL: https://puppet-panic-grand-prix.adityasuresh2110.workers.dev
-        run: node tests/grandprix-polish-browser.mjs
+        run: |
+          node tests/grandprix-polish-browser.mjs
+          node tests/grandprix-branding-browser.mjs
