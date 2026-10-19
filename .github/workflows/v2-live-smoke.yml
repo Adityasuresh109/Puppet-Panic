@@ -1,0 +1,20 @@
+name: Live isolated Grand Prix 24-controller smoke
+on:
+  push:
+    branches: [v2-race]
+    paths:
+      - 'scripts/v2-cloud-smoke.mjs'
+      - '.github/workflows/v2-live-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cloud:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Validate real 24-phone relay and live stage telemetry
+        run: node scripts/v2-cloud-smoke.mjs
