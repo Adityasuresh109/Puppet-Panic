@@ -6,8 +6,8 @@ export default {
   async fetch(request,env){
     const url=new URL(request.url);
     if(url.pathname==='/health'||url.pathname.startsWith('/api/'))return relay.fetch(request,env);
-    if(url.pathname==='/')url.pathname='/grand-prix.html';
-    const assetRequest=new Request(url.toString(),request);
-    return env.ASSETS.fetch(assetRequest);
+    // The assets manifest serves / from dist-v2/index.html automatically.
+    // Forward the original request unchanged so manifest routing applies.
+    return env.ASSETS.fetch(request);
   }
 };
