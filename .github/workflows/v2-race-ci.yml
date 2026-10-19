@@ -11,6 +11,7 @@ on:
       - 'worker/implementation.js'
       - 'tests/grandprix*.test.js'
       - 'tests/grandprix-polish-browser.mjs'
+      - 'tests/grandprix-branding-browser.mjs'
       - '.github/workflows/v2-race-ci.yml'
 permissions:
   contents: read
@@ -37,3 +38,4 @@ jobs:
           npx playwright install --with-deps chromium
           node tests/grandprix-browser.mjs
           node tests/grandprix-polish-browser.mjs
+          node tests/grandprix-branding-browser.mjs

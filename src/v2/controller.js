@@ -75,5 +75,5 @@ if(params.get('room')){
   }
  }catch{}
 }
-if(preview){code='DEMO00';token='';offline=false;room={phase:'warmup',variant:'grandprix',hostOnline:true,mode:GP_EVENTS.some(e=>e.id===params.get('mode'))?params.get('mode'):'walk',players:[{id:'preview',role:previewRole,teamName:'BLUE BLUNDERS'}],you:{id:'preview'}};render();$('connect-status').textContent='● UI DEMO';}
+if(preview){code='DEMO00';token='';offline=false;room={phase:'warmup',variant:'grandprix',hostOnline:true,mode:GP_EVENTS.some(e=>e.id===params.get('mode'))?params.get('mode'):'walk',players:[{id:'preview',role:previewRole,teamName:'BLUE BLUNDERS'}],you:{id:'preview'}};render();$('connect-status').textContent='● PRACTICE MODE';}
 btnEnable();
