@@ -40,7 +40,7 @@ function banner(text){clearTimeout(jobTimeout);$('new-job').textContent='NEW JOB
 function updateJob(nextStage,notify=false){const player=selectedPlayer();if(!player)return;
  stage=nextStage;const sentences=(GP_ACTIONS[player.role]||[]).map(limb=>gpJob(limb,stage));const job=sentences.join(' · ');
  $('job').textContent=job||'LOOK AT THE TV';if(notify)banner(job);
- const footnotes={climb:'THREE HOLD · ONE REACHES',walk:'STEP WITH THE PULSING BEAT TO GO FASTER · OFF-BEAT STEPS STILL WORK',cake:'ARMS UP · WALK SMOOTHLY',swing:'GRIP BOTH ARMS · PUMP LEGS'};
+ const footnotes={climb:'THREE HOLD · ONE REACHES',walk:'FOLLOW THE BEAT PULSE FOR FASTER STEPS · OFF-BEAT STILL WORKS',cake:'ARMS UP · WALK SMOOTHLY',swing:'GRIP BOTH ARMS · PUMP LEGS'};
  $('cue').textContent=room.phase==='warmup'?'PRACTICE YOUR BUTTONS · TELL HOST WHEN READY':footnotes[stage]||'LOOK AT THE TV';
 }
 function render(){const p=selectedPlayer();if(!p)return;
