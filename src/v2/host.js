@@ -40,7 +40,7 @@ function lobby(){
   const label=document.createElement('strong');label.textContent=t.name+' · '+t.size+' PLAYER'+(t.size===1?'':'S');const names=document.createElement('small');names.textContent=room.players.filter(p=>p.teamId===t.id).map(p=>p.name).join(' · ');el.append(label,names);teams.append(el);}
  $('event').value=room.mode||'walk';$('event').disabled=room.phase!=='lobby';
  $('warmup').disabled=room.phase!=='lobby'||room.players.length<1||Boolean(room.warmedUp);
- $('start').disabled=starting||!room.warmedUp&&room.phase!=='warmup';
+ $('start').disabled=starting||!room.warmedUp&&room.phase!=='warmup';$('start-race').hidden=room.phase!=='warmup';
 }
 function connect(){connection?.close();connection=watchRoom(code,token,{onConnection(x){connected=x==='connected';$('host-connection').textContent=connected?'● ROOM CONNECTED':'● RECONNECTING · PAUSED';if(!connected){input.clear();inputTime.clear();acc=0;}},onMessage(message){
  if(message.type==='room'){
@@ -104,7 +104,9 @@ $('create').addEventListener('click',async()=>{if(creating||code)return;creating
  try{const result=await request('create',{variant:'grandprix'});code=result.code;token=result.token;localStorage.setItem(HOST_KEY,JSON.stringify({code,token,savedAt:Date.now()}));room=await snapshot(code,token);lobby();connect();alertHost('');}catch(e){alertHost(e.message);}finally{creating=false;$('create').disabled=Boolean(code);}});
 $('event').addEventListener('change',async()=>{try{await api('mode',{mode:$('event').value});}catch(e){alertHost(e.message);}});
 $('warmup').addEventListener('click',async()=>{try{await api('warmup');}catch(e){alertHost(e.message);}});
-$('start').addEventListener('click',async()=>{if(starting||!room)return;starting=true;try{if(room.phase!=='warmup'&&!room.warmedUp)throw Error('Warm up first');await api('start',{format:'olympics'});alertHost('');}catch(e){alertHost(e.message);}finally{starting=false;}});
+async function startRace(){if(starting||!room)return;starting=true;try{if(room.phase!=='warmup'&&!room.warmedUp)throw Error('Warm up first');await api('start',{format:'olympics'});alertHost('');}catch(e){alertHost(e.message);}finally{starting=false;}}
+$('start').addEventListener('click',startRace);
+$('start-race').addEventListener('click',startRace);
 $('next').addEventListener('click',async()=>{if(!ended||raceIndex>=4)return;$('next').disabled=true;try{
  const desired=stagesForRace[raceIndex+1];let state=await snapshot(code,token);if(state.phase==='playing'){await api('reset');state=await snapshot(code,token);}if(state.mode!==desired)await api('mode',{mode:desired});raceIndex++;localStorage.removeItem(STATE_KEY);await api('start',{format:'olympics'});
  }catch(e){alertHost(e.message);}finally{$('next').disabled=false;}});
