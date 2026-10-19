@@ -10,6 +10,7 @@ on:
       - 'grand-prix.html'
       - 'grand-prix-controller.html'
       - 'scripts/build-grandprix.js'
+      - 'tests/grandprix-polish-browser.mjs'
       - '.github/workflows/v2-preview-deploy.yml'
 permissions:
   contents: read
@@ -39,3 +40,11 @@ jobs:
           curl --fail --show-error --silent --retry 5 --retry-delay 2 https://puppet-panic-grand-prix.adityasuresh2110.workers.dev/health
           curl --fail --show-error --silent --retry 5 --retry-delay 2 https://puppet-panic-grand-prix.adityasuresh2110.workers.dev/ -o /tmp/v2-host.html
           grep -q 'GRAND PRIX' /tmp/v2-host.html
+      - name: Install Chromium for live deployed-asset acceptance
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Verify all three changes against deployed preview
+        env:
+          GRAND_PRIX_BASE_URL: https://puppet-panic-grand-prix.adityasuresh2110.workers.dev
+        run: node tests/grandprix-polish-browser.mjs
