@@ -1,5 +1,6 @@
 import {allocateTeams,assignPlayers,ACTIONS,MAX_PLAYERS} from '../src/teams.js';
 import {EVENT_IDS} from '../src/events.js';
+import {gpTeams,gpAssign,GP_ACTIONS,GP_EVENT_IDS,GP_MAX_PLAYERS} from '../src/v2/rules.js';
 
 const ORIGINS=new Set(['https://adityasuresh109.github.io','http://localhost:4173','http://127.0.0.1:4173']);
 const ROOM_TTL=4*60*60*1000;
@@ -32,10 +33,11 @@ export default {
   }
   try{
     if(request.method==='POST'&&path==='/api/create'){
+      const body=await parse(request);if(body.variant&&!['olympics','grandprix'].includes(body.variant))return externalCors(request,json({error:'Invalid game variant'},400));
       for(let n=0;n<5;n++){
         const code=gen(3).toUpperCase();
         const stub=env.PARTY_ROOM.getByName(code);
-        const response=await stub.fetch(new Request('https://relay.internal/create',{method:'POST',body:JSON.stringify({code})}));
+        const response=await stub.fetch(new Request('https://relay.internal/create',{method:'POST',body:JSON.stringify({code,variant:body.variant||'olympics'})}));
         if(response.status===409)continue;
         return externalCors(request,response);
       }
@@ -60,14 +62,14 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  async save(){await this.ctx.storage.put('room',this.room);}
  alive(){return this.room&&this.room.createdAt+ROOM_TTL>Date.now();}
  auth(token){if(!this.room||typeof token!=='string')return null;if(token===this.room.hostToken)return {host:true};return this.room.players.find(p=>p.token===token)||null;}
- snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),teams:r.players.length>=2?allocateTeams(r.players.length):[],...(p.host?{checkpoint:r.checkpoint||null}:{}),hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:MAX_PLAYERS};}
+ snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),variant:r.variant||'olympics',teams:r.players.length>=(r.variant==='grandprix'?1:2)?(r.variant==='grandprix'?gpTeams(r.players.length):allocateTeams(r.players.length)):[],...(p.host?{checkpoint:r.checkpoint||null}:{}),hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:r.variant==='grandprix'?GP_MAX_PLAYERS:MAX_PLAYERS};}
  forSockets(fn){for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.authenticated)fn(ws,a);}}
  send(ws,data){try{ws.send(JSON.stringify(data));}catch{}}
  broadcastState(){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(p)this.send(ws,this.snapshot(p));});}
  broadcastHost(data){this.forSockets((ws,a)=>{if(a.host)this.send(ws,data);});}
  broadcastTelemetry(teams){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(!p||p.host)return;const t=teams.find(x=>x.id===p.teamId);if(t)this.send(ws,{type:'telemetry',teamId:t.id,progress:t.progress,unsteady:t.unsteady,expectedSide:t.expectedSide,phase:t.phase,mode:this.room.mode});});}
- rebalance(){if(this.room.phase!=='lobby')return;const players=this.room.players,alloc=assignPlayers(players);for(let i=0;i<players.length;i++){const x=alloc[i],p=players[i];p.teamId=x?.teamId??null;p.teamName=x?.teamName??null;p.teamColor=x?.teamColor??null;p.seat=x?.seat??null;p.role=alloc.filter(t=>t.teamId===x?.teamId)[((x?.seat||0)+(this.room.roundNumber||0))%alloc.filter(t=>t.teamId===x?.teamId).length]?.role??null;p.seq=0;p.controls={};}}
- validatedInput(p,seq,controls){if(this.room.phase!=='playing')throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;const keys=ACTIONS[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!keys.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');p.seq=seq;p.controls=Object.fromEntries(keys.map(k=>[k,controls[k]===true]));this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;}
+ rebalance(){if(this.room.phase!=='lobby')return;const players=this.room.players,alloc=players.length?(this.room.variant==='grandprix'?gpAssign(players,this.room.roundNumber||0):assignPlayers(players)):[];for(let i=0;i<players.length;i++){const x=alloc[i],p=players[i];p.teamId=x?.teamId??null;p.teamName=x?.teamName??null;p.teamColor=x?.teamColor??null;p.seat=x?.seat??null;p.role=this.room.variant==='grandprix'?x?.role??null:alloc.filter(t=>t.teamId===x?.teamId)[((x?.seat||0)+(this.room.roundNumber||0))%alloc.filter(t=>t.teamId===x?.teamId).length]?.role??null;p.seq=0;p.controls={};}}
+ validatedInput(p,seq,controls){if(this.room.phase!=='playing'&&!(this.room.variant==='grandprix'&&this.room.phase==='warmup'))throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;const keys=(this.room.variant==='grandprix'?GP_ACTIONS:ACTIONS)[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!keys.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');p.seq=seq;p.controls=Object.fromEntries(keys.map(k=>[k,controls[k]===true]));this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;}
  async fetch(request){const url=new URL(request.url),path=url.pathname;
   try{
    if(path==='/rate'&&request.method==='POST'){
@@ -84,8 +86,8 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    await this.load();
    if(path==='/create'&&request.method==='POST'){
      if(this.alive())return json({error:'Room code collision'},409);
-     const {code}=await parse(request);if(!validateCode(code))return json({error:'Invalid room'},400);
-     this.room={code,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',roundNumber:0,rosterLocked:false,players:[]};
+     const {code,variant='olympics'}=await parse(request);if(!validateCode(code)||!['olympics','grandprix'].includes(variant))return json({error:'Invalid room'},400);
+     this.room={code,variant,hostToken:gen(24),createdAt:Date.now(),phase:'lobby',mode:'walk',roundNumber:0,rosterLocked:false,players:[]};
      await this.save();await this.ctx.storage.setAlarm(Date.now()+ROOM_TTL);
      return json({code,token:this.room.hostToken});
    }
@@ -105,7 +107,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
        p.token=gen(24);p.seq=0;p.controls={};p.online=false;
      }else{
        if(this.room.phase!=='lobby'||this.room.rosterLocked)throw Error('Tournament roster is locked. Rejoin on your existing phone or wait for a new party.');
-       if(this.room.players.length>=25)throw Error('Room full (25 players)');
+       if(this.room.players.length>=(this.room.variant==='grandprix'?GP_MAX_PLAYERS:MAX_PLAYERS))throw Error('Room full');
        p={id:crypto.randomUUID(),token:gen(24),name:cleanName(body.name),teamId:null,role:null,online:false,controls:{},seq:0};
        this.room.players.push(p);this.rebalance();
      }
@@ -120,12 +122,17 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      const accepted=this.validatedInput(p,body.seq,body.controls);return json({ok:true,accepted});
    }
    if(!p.host)return json({error:'Host access required'},403);
+   if(path==='/warmup'&&request.method==='POST'){
+     if(this.room.variant!=='grandprix'||this.room.phase!=='lobby'||this.room.players.length<1)throw Error('Warm up requires Grand Prix lobby with players');
+     this.rebalance();this.room.rosterLocked=true;this.room.warmedUp=true;this.room.phase='warmup';await this.save();this.broadcastState();return json({ok:true});
+   }
    if(path==='/mode'&&request.method==='POST'){
-     if(this.room.phase!=='lobby'||!EVENT_IDS.includes(body.mode))throw Error('Select the challenge in the lobby');
+     if(this.room.phase!=='lobby'||!(this.room.variant==='grandprix'?GP_EVENT_IDS:EVENT_IDS).includes(body.mode))throw Error('Select the challenge in the lobby');
      this.room.mode=body.mode;await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/start'&&request.method==='POST'){
-     if(this.room.phase!=='lobby'||this.room.players.length<2)throw Error('At least two players required in lobby');
+     if((this.room.phase!=='lobby'&&!(this.room.variant==='grandprix'&&this.room.phase==='warmup'))||this.room.players.length<(this.room.variant==='grandprix'?1:2))throw Error('Not enough players');
+     if(this.room.variant==='grandprix'&&!this.room.warmedUp)throw Error('Warm-up required before racing');
      this.rebalance();if(body.format==='olympics')this.room.rosterLocked=true;this.room.phase='playing';await this.save();this.broadcastState();return json({ok:true});
    }
    if(path==='/reset'&&request.method==='POST'){
@@ -151,7 +158,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      this.room=null;await this.ctx.storage.deleteAll();return json({ok:true});
    }
    if(path==='/telemetry'&&request.method==='POST'){
-     if(this.room.phase==='playing'&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),phase:String(x.phase||'').slice(0,20)})));
+     if((this.room.phase==='playing'||this.room.phase==='warmup')&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,this.room.variant==='grandprix'?6:5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),phase:String(x.phase||'').slice(0,20)})));
      return json({ok:true});
    }
    return json({error:'Unknown API endpoint'},404);
@@ -177,7 +184,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
    const p=this.auth(attachment.token);if(!p){ws.close(1008,'Expired credentials');return;}
    const now=Date.now();let rate=this.rate.get(attachment.token)||{start:now,n:0};if(now-rate.start>1000)rate={start:now,n:0};if(++rate.n>35){ws.close(1008,'Rate limited');return;}this.rate.set(attachment.token,rate);
    if(msg.type==='input'&&!p.host){this.validatedInput(p,msg.seq,msg.controls);return;}
-   if(msg.type==='telemetry'&&p.host){if(Array.isArray(msg.teams))this.broadcastTelemetry(msg.teams.slice(0,5));return;}
+   if(msg.type==='telemetry'&&p.host){if(Array.isArray(msg.teams))this.broadcastTelemetry(msg.teams.slice(0,this.room.variant==='grandprix'?6:5));return;}
    if(msg.type==='ping'){this.send(ws,{type:'pong'});return;}
    ws.close(1008,'Invalid event');
   }catch{ws.close(1008,'Malformed event');}
