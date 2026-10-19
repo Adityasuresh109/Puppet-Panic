@@ -73,6 +73,21 @@ try{
  assert.equal(await phone.locator('#buttons button').count(),4,'solo controller retains four limbs');
  console.log('PASS'+(LIVE?' LIVE':' LOCAL')+': created room, joined through phone and displayed four-limb pad');
 
+ // Developer-only ?preview= controls remain usable, but the real joined
+ // player above must never receive the isolated practice-state indicator.
+ const devCtx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+ const devPhone=await devCtx.newPage();
+ await devPhone.goto(phoneUrl+'?preview=LEFT_LEG');
+ await devPhone.locator('#pad').waitFor({state:'visible',timeout:7000});
+ assert.equal(await devPhone.locator('#buttons button').count(),1);
+ await devPhone.locator('#buttons button').focus();
+ await devPhone.keyboard.down('Space');
+ assert.match((await devPhone.locator('#limb-leftLeg').getAttribute('class'))||'',/pressed/);
+ await devPhone.keyboard.up('Space');
+ assert.doesNotMatch(await phone.locator('#connect-status').innerText(),/demo|preview|practice/i);
+ await devCtx.close();
+ console.log('PASS'+(LIVE?' LIVE':' LOCAL')+': developer controller preview still responds, but real players see no dev status');
+
  await host.locator('#warmup').click();
  await host.locator('#race').waitFor({state:'visible',timeout:12000});
  await phone.waitForFunction(()=>document.querySelector('#event-name')?.textContent?.includes('WARM UP'),null,{timeout:12000});
