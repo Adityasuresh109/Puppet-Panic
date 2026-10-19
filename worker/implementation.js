@@ -2,7 +2,7 @@ import {allocateTeams,assignPlayers,ACTIONS,MAX_PLAYERS} from '../src/teams.js';
 import {EVENT_IDS} from '../src/events.js';
 import {gpTeams,gpAssign,GP_ACTIONS,GP_EVENT_IDS,GP_MAX_PLAYERS} from '../src/v2/rules.js';
 
-const ORIGINS=new Set(['https://adityasuresh109.github.io','http://localhost:4173','http://127.0.0.1:4173']);
+const ORIGINS=new Set(['https://puppet-panic-grand-prix.adityasuresh2110.workers.dev','https://adityasuresh109.github.io','http://localhost:4173','http://127.0.0.1:4173']);
 const ROOM_TTL=4*60*60*1000;
 const gen=(n)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toString(16).padStart(2,'0')).join('');
 const validateCode=c=>typeof c==='string'&&/^[A-F0-9]{6}$/.test(c.toUpperCase());
@@ -62,12 +62,12 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
  async save(){await this.ctx.storage.put('room',this.room);}
  alive(){return this.room&&this.room.createdAt+ROOM_TTL>Date.now();}
  auth(token){if(!this.room||typeof token!=='string')return null;if(token===this.room.hostToken)return {host:true};return this.room.players.find(p=>p.token===token)||null;}
- snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),variant:r.variant||'olympics',teams:r.players.length>=(r.variant==='grandprix'?1:2)?(r.variant==='grandprix'?gpTeams(r.players.length):allocateTeams(r.players.length)):[],...(p.host?{checkpoint:r.checkpoint||null}:{}),hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:r.variant==='grandprix'?GP_MAX_PLAYERS:MAX_PLAYERS};}
+ snapshot(p){const r=this.room;return {type:'room',code:r.code,phase:r.phase,mode:r.mode,roundNumber:r.roundNumber||0,players:r.players.map(({id,name,teamId,teamName,teamColor,role,seat,online})=>({id,name,teamId,teamName,teamColor,role,seat,online})),variant:r.variant||'olympics',warmedUp:r.warmedUp===true,teams:r.players.length>=(r.variant==='grandprix'?1:2)?(r.variant==='grandprix'?gpTeams(r.players.length):allocateTeams(r.players.length)):[],...(p.host?{checkpoint:r.checkpoint||null}:{}),hostOnline:this.ctx.getWebSockets().some(ws=>ws.readyState===1&&ws.deserializeAttachment()?.host&&ws.deserializeAttachment()?.authenticated),rosterLocked:!!r.rosterLocked,you:p.host?{host:true}:{id:p.id,role:p.role,teamId:p.teamId},maxPlayers:r.variant==='grandprix'?GP_MAX_PLAYERS:MAX_PLAYERS};}
  forSockets(fn){for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.authenticated)fn(ws,a);}}
  send(ws,data){try{ws.send(JSON.stringify(data));}catch{}}
  broadcastState(){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(p)this.send(ws,this.snapshot(p));});}
  broadcastHost(data){this.forSockets((ws,a)=>{if(a.host)this.send(ws,data);});}
- broadcastTelemetry(teams){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(!p||p.host)return;const t=teams.find(x=>x.id===p.teamId);if(t)this.send(ws,{type:'telemetry',teamId:t.id,progress:t.progress,unsteady:t.unsteady,expectedSide:t.expectedSide,phase:t.phase,mode:this.room.mode});});}
+ broadcastTelemetry(teams){this.forSockets((ws,a)=>{const p=this.auth(a.token);if(!p||p.host)return;const t=teams.find(x=>x.id===p.teamId);if(t)this.send(ws,{type:'telemetry',teamId:t.id,progress:t.progress,unsteady:t.unsteady,expectedSide:t.expectedSide,stage:t.stage,beat:t.beat,phase:t.phase,mode:this.room.mode});});}
  rebalance(){if(this.room.phase!=='lobby')return;const players=this.room.players,alloc=players.length?(this.room.variant==='grandprix'?gpAssign(players,this.room.roundNumber||0):assignPlayers(players)):[];for(let i=0;i<players.length;i++){const x=alloc[i],p=players[i];p.teamId=x?.teamId??null;p.teamName=x?.teamName??null;p.teamColor=x?.teamColor??null;p.seat=x?.seat??null;p.role=this.room.variant==='grandprix'?x?.role??null:alloc.filter(t=>t.teamId===x?.teamId)[((x?.seat||0)+(this.room.roundNumber||0))%alloc.filter(t=>t.teamId===x?.teamId).length]?.role??null;p.seq=0;p.controls={};}}
  validatedInput(p,seq,controls){if(this.room.phase!=='playing'&&!(this.room.variant==='grandprix'&&this.room.phase==='warmup'))throw Error('Match not active');if(!Number.isSafeInteger(seq)||seq<=p.seq)return false;const keys=(this.room.variant==='grandprix'?GP_ACTIONS:ACTIONS)[p.role]||[];if(!controls||typeof controls!=='object'||Array.isArray(controls)||Object.entries(controls).some(([k,v])=>!keys.includes(k)||typeof v!=='boolean'))throw Error('Invalid controls for role');p.seq=seq;p.controls=Object.fromEntries(keys.map(k=>[k,controls[k]===true]));this.broadcastHost({type:'input',playerId:p.id,teamId:p.teamId,controls:p.controls,seq});return true;}
  async fetch(request){const url=new URL(request.url),path=url.pathname;
@@ -158,7 +158,7 @@ export function makePartyRoom(Base){return class PartyRoom extends Base {
      this.room=null;await this.ctx.storage.deleteAll();return json({ok:true});
    }
    if(path==='/telemetry'&&request.method==='POST'){
-     if((this.room.phase==='playing'||this.room.phase==='warmup')&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,this.room.variant==='grandprix'?6:5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),phase:String(x.phase||'').slice(0,20)})));
+     if((this.room.phase==='playing'||this.room.phase==='warmup')&&Array.isArray(body.teams))this.broadcastTelemetry(body.teams.slice(0,this.room.variant==='grandprix'?6:5).map(x=>({id:Number(x.id),progress:Math.max(0,Math.min(1,Number(x.progress)||0)),unsteady:Math.max(0,Math.min(1,Number(x.unsteady)||0)),expectedSide:String(x.expectedSide||'left').slice(0,8),stage:String(x.stage||'walk').slice(0,12),beat:Math.max(0,Math.min(1,Number(x.beat)||0)),phase:String(x.phase||'').slice(0,20)})));
      return json({ok:true});
    }
    return json({error:'Unknown API endpoint'},404);
