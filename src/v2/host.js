@@ -35,7 +35,7 @@ function lobby(){
  $('host-phase').textContent=room?.phase==='warmup'?'WARM UP':room?.phase==='playing'?'RACING':room?.phase==='lobby'?'LOBBY':'NO ROOM';
  if(!room)return;
  $('player-count').textContent=room.players.length+' / 24';$('join-link').textContent=invite(code);
- if(room.players.length){try{renderQr($('join-qr'),invite(code));}catch(e){console.warn('QR error',e);}}
+ if(code){try{renderQr($('join-qr'),invite(code));}catch(e){console.warn('QR error',e);}}
  const teams=$('teams');teams.replaceChildren();for(const t of room.teams||[]){const el=document.createElement('div');el.className='gp-team';el.style.setProperty('--team',t.color);
   const label=document.createElement('strong');label.textContent=t.name+' · '+t.size+' PLAYER'+(t.size===1?'':'S');const names=document.createElement('small');names.textContent=room.players.filter(p=>p.teamId===t.id).map(p=>p.name).join(' · ');el.append(label,names);teams.append(el);}
  $('event').value=room.mode||'walk';$('event').disabled=room.phase!=='lobby';
