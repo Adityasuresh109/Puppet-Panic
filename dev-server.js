@@ -14,7 +14,7 @@ export function createApp(){return http.createServer(async(req,res)=>{
   if(route==='/health')return send(res,200,{ok:true,version:1,service:'puppet-panic-lan'});
   if(route.startsWith('/api/')){
    try{
-    if(route==='/api/create'&&req.method==='POST'){const room=store.create();return send(res,200,{code:room.code,token:room.hostToken});}
+    if(route==='/api/create'&&req.method==='POST'){const body=await readBody(req);const room=store.create(body.variant||'olympics');return send(res,200,{code:room.code,token:room.hostToken});}
     const body=req.method==='POST'?await readBody(req,route==='/api/checkpoint'?90000:8192):{};
     const room=store.find(body.code||url.searchParams.get('code'));
     if(!room) return send(res,404,{error:'Room not found. Ask the host for the new code.'});
@@ -38,6 +38,7 @@ export function createApp(){return http.createServer(async(req,res)=>{
       store.input(room,person,body.seq,body.controls);return send(res,200,{ok:true});
     }
     if(!person.host)return send(res,403,{error:'Host access required'});
+    if(route==='/api/warmup'&&req.method==='POST'){store.warmup(room);return send(res,200,{ok:true});}
     if(route==='/api/mode'&&req.method==='POST'){store.mode(room,body.mode);return send(res,200,{ok:true});}
     if(route==='/api/start'&&req.method==='POST'){store.start(room,body.format);return send(res,200,{ok:true});}
     if(route==='/api/reset'&&req.method==='POST'){store.reset(room,body.finishTournament);return send(res,200,{ok:true});}
@@ -49,7 +50,7 @@ export function createApp(){return http.createServer(async(req,res)=>{
     if(route==='/api/end'&&req.method==='POST'){store.end(room);return send(res,200,{ok:true});}
     if(route==='/api/telemetry'&&req.method==='POST'){
       // The host owns simulation/score. Publish only bounded, non-sensitive status to phones.
-      if(room.phase==='playing'&&Array.isArray(body.teams)) for(const [key] of room.connections){const who=store.auth(room,key);if(!who||who.host)continue;
+      if(['playing','warmup'].includes(room.phase)&&Array.isArray(body.teams)) for(const [key] of room.connections){const who=store.auth(room,key);if(!who||who.host)continue;
         const t=body.teams.find(x=>x.id===who.teamId);if(t)store.emit(room,key,{type:'telemetry',teamId:t.id,expectedSide:t.expectedSide,unsteady:t.unsteady,phase:t.phase,progress:t.progress,mode:room.mode});}
       return send(res,200,{ok:true});
     }
