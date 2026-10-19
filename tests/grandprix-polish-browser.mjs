@@ -36,7 +36,16 @@ try{
 
  // Six real lanes must all render the whole word, fully inside each lane
  // and left of the finish post, even on a densely packed 24-player race.
- for(let i=0;i<24;i++){
+ // One real phone joins through the screen, while 23 additional peers
+ // fill the other lanes. This verifies the player-facing beat explanation too.
+ const racerContext=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+ const racer=await racerContext.newPage();
+ racer.on('pageerror',e=>errors.push('racer: '+e.message));
+ await racer.goto(phoneUrl+'?room='+roomCode);
+ await racer.locator('#name').fill('Beat Racer');
+ await racer.locator('#join-button').click();
+ await racer.locator('#pad').waitFor({state:'visible',timeout:12000});
+ for(let i=1;i<24;i++){
   const response=await fetch(base+'/api/join',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:roomCode,name:'Polish Guest '+(i+1)})});
   assert.equal(response.status,200,'join slot '+i+': '+await response.text());
  }
@@ -66,7 +75,10 @@ try{
  assert.match(hostHelp,/pulsing beat/);
  assert.match(hostHelp,/faster/);
  assert.match(hostHelp,/off-beat steps still work/);
- console.log('PASS #2'+(LIVE?' LIVE':' LOCAL')+': TV explains beat speed bonus and off-beat progress');
+ await host.locator('#start-race').waitFor({state:'visible',timeout:10000});
+ await host.locator('#start-race').click();
+ await racer.waitForFunction(()=>/beat pulse.*faster steps.*off-beat still works/i.test(document.querySelector('#cue')?.textContent||''),null,{timeout:10000});
+ console.log('PASS #2'+(LIVE?' LIVE':' LOCAL')+': TV and phone explain beat speed bonus and off-beat progress');
 
  // Autofill: value assigned without input, change, or keydown. The load
  // handler must detect it before a visitor can click JOIN.
