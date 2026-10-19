@@ -1,0 +1,37 @@
+name: Grand Prix v2 branch verification
+on:
+  push:
+    branches: [v2-race]
+  pull_request:
+    paths:
+      - 'src/v2/**'
+      - 'grand-prix.html'
+      - 'grand-prix-controller.html'
+      - 'worker/grandprix.js'
+      - 'worker/implementation.js'
+      - 'tests/grandprix*.test.js'
+      - '.github/workflows/v2-race-ci.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Test all v1 and v2 contracts
+        run: node --test tests/*.test.js
+      - name: Syntax and isolated static build
+        run: |
+          node --check src/v2/host.js
+          node --check src/v2/controller.js
+          node --check worker/implementation.js
+          node scripts/build.js
+          node scripts/build-grandprix.js
+      - name: Verify Grand Prix host and mobile browser flow
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node tests/grandprix-browser.mjs
