@@ -55,6 +55,18 @@ $('join-form').addEventListener('submit',async e=>{e.preventDefault();if(joining
  const response=await api('join',{name,token:previous});token=response.token;localStorage.setItem(savedKey,JSON.stringify({token,name,savedAt:Date.now()}));
  room=await snapshot(code,token);render();openStream();
  }catch(e){$('join-error').textContent=e.message;}finally{joining=false;btnEnable();}});
-if(params.get('room'))$('code').value=params.get('room').toUpperCase();
+if(params.get('room')){
+ const rememberedRoom=params.get('room').toUpperCase();
+ $('code').value=rememberedRoom;
+ try{
+  const saved=JSON.parse(localStorage.getItem('gp-phone-'+rememberedRoom)||'null');
+  if(saved?.name&&saved?.token&&Date.now()-saved.savedAt<14400000&&!preview){
+   $('name').value=saved.name;
+   // Reclaim the existing seat with a rotated token after page refresh.
+   // Never auto-create another lobby player.
+   queueMicrotask(()=>$('join-form').requestSubmit());
+  }
+ }catch{}
+}
 if(preview){code='DEMO00';token='';offline=false;room={phase:'warmup',variant:'grandprix',hostOnline:true,mode:GP_EVENTS.some(e=>e.id===params.get('mode'))?params.get('mode'):'walk',players:[{id:'preview',role:previewRole,teamName:'BLUE BLUNDERS'}],you:{id:'preview'}};render();$('connect-status').textContent='● UI DEMO';}
 btnEnable();
