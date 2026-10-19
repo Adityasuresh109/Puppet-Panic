@@ -46,7 +46,7 @@ function render(){const p=selectedPlayer();if(!p)return;
  if(!canInput)$('cue').textContent=room.hostOnline===false?'HOST IS OFFLINE · YOUR PLACE IS SAVED':room.phase==='lobby'?'WAIT FOR THE HOST TO START':'RECONNECTING';
 }
 function openStream(){stream?.close();stream=watchRoom(code,token,{onConnection(x){offline=x!=='connected';$('connect-status').textContent=x==='connected'?'● CONNECTED':x==='connecting'?'● CONNECTING':'● RECONNECTING';if(offline)releaseAll();if(room)render();},onMessage(m){
- if(m.type==='room'){const previous=selectedPlayer()?.role,mode=room?.mode;room=m;if(previous&&previous!==selectedPlayer()?.role)releaseAll();if(mode!==room.mode)stage='';if(room.hostOnline===false)releaseAll();render();}
+ if(m.type==='room'){const previous=selectedPlayer()?.role,mode=room?.mode,previousPhase=room?.phase;room=m;if(previous&&previous!==selectedPlayer()?.role)releaseAll();if(mode!==room.mode)stage='';if(room.hostOnline===false)releaseAll();render();if(room.phase==='playing'&&previousPhase!=='playing')updateJob(stage||room.mode,true);}
  if(m.type==='telemetry'){const next=m.stage||gpStage(m.mode||room?.mode,m.progress||0);if(next&&next!==stage){updateJob(next,room?.phase==='playing');}if(m.phase==='fallen')$('cue').textContent='WHOOPS! BACK UP IN A SECOND';}
  if(m.type==='ended'||m.type==='kicked'){releaseAll();stream?.close();stream=null;room=null;token='';$('join').hidden=false;$('pad').hidden=true;$('join-error').textContent=m.type==='ended'?'HOST ENDED THE PARTY. ASK FOR A NEW CODE.':'HOST REMOVED THIS PLAYER.';}
  }});}
